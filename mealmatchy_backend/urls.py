@@ -1,0 +1,23 @@
+# mealmatchy_backend/urls.py
+from django.contrib import admin
+from django.urls import path, include
+from django.views.generic import RedirectView
+from django.conf import settings
+from django.conf.urls.static import static
+
+urlpatterns = [
+    path('', RedirectView.as_view(pattern_name='home', permanent=False)),  # หรือ menu_list ถ้าต้องการ
+    path('admin/', admin.site.urls),
+    path('accounts/', include('accounts.urls')),
+    path('menus/', include('menus.urls')),
+
+
+    # ✅ เพิ่มสองบรรทัดนี้ให้ /register และ /login ใช้ได้ที่รูท
+    path('register/', RedirectView.as_view(pattern_name='register', permanent=False)),
+    path('login/',    RedirectView.as_view(pattern_name='login', permanent=False)),
+    path('logout/', RedirectView.as_view(pattern_name='logout', permanent=False)),
+
+]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
