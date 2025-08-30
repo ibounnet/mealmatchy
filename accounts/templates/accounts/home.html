@@ -1,40 +1,38 @@
-<!DOCTYPE html>
-<html lang="th">
-<head>
-    <meta charset="UTF-8">
-    <title>หน้าแรก - MealMatchy</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-orange-50 min-h-screen">
-    <div class="max-w-4xl mx-auto p-6">
-        
-        <!-- หัวเรื่อง -->
-        <h1 class="text-3xl font-bold text-orange-600 text-center mb-6">
-            Welcome to MealMatchy
-        </h1>
-
-        <!-- ปุ่ม Logout -->
-        <div class="flex justify-end mb-4">
-            <a href="{% url 'logout' %}" 
-               class="text-sm text-red-500 font-semibold hover:underline">
-                Logout
-            </a>
-        </div>
-
-        <!-- กล่องเมนูประหยัด -->
-        <div class="bg-white rounded-lg shadow p-6">
-            <h2 class="text-xl font-bold text-gray-700 mb-3">
-                🍚 เมนูอาหารประหยัดไม่เกิน 50 บาท
-            </h2>
-            <ul class="list-disc list-inside text-gray-700 space-y-1">
-                <li>ข้าวไข่เจียว - 30 บาท</li>
-                <li>ผัดมาม่ากะเพรา - 35 บาท</li>
-                <li>ข้าวผัดหมู - 45 บาท</li>
-                <li>ข้าวผัดพริกแกงหมู - 45 บาท</li>
-                <li>ข้าวต้มหมู - 50 บาท</li>
-            </ul>
-        </div>
-
+{% extends 'base.html' %}
+{% block title %}หน้าแรก - MealMatchy{% endblock %}
+{% block content %}
+<div class="bg-white rounded-2xl ring-1 ring-gray-100 p-6">
+  <form method="get" class="flex items-end gap-3 mb-6">
+    <div>
+      <label class="block text-sm text-gray-600 mb-1">งบประมาณ (บาท)</label>
+      <input type="number" name="budget" value="{{ budget }}" min="0"
+             class="rounded-xl border border-gray-200 px-3 py-2 w-40" />
     </div>
-</body>
-</html>
+    <button class="px-4 py-2 rounded-xl bg-primary text-white hover:bg-primary-dark">แนะนำเมนู</button>
+  </form>
+
+  <h2 class="text-xl font-bold mb-4">เมนูแนะนำ (≤ {{ budget }} บาท)</h2>
+
+  {% if menus %}
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      {% for m in menus %}
+        <div class="bg-white ring-1 ring-gray-100 rounded-2xl overflow-hidden">
+          {% if m.image %}
+            <img src="{{ m.image.url }}" class="w-full h-40 object-cover" alt="{{ m.name }}">
+          {% else %}
+            <div class="w-full h-40 bg-orange-50 flex items-center justify-center text-orange-500">ไม่มีรูป</div>
+          {% endif %}
+          <div class="p-4">
+            <div class="text-xs text-gray-500">ร้าน: {{ m.restaurant_name|default:"-" }}</div>
+            <div class="font-semibold">{{ m.name }}</div>
+            <div class="text-sm text-gray-600 line-clamp-2">{{ m.description|default:"-" }}</div>
+            <div class="mt-2 font-bold text-orange-600">{{ m.price }} บาท</div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="text-gray-600">ไม่พบเมนูในงบนี้</div>
+  {% endif %}
+</div>
+{% endblock %}

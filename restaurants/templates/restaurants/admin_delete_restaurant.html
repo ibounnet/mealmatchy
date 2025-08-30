@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+{% block title %}ลบร้านอาหาร{% endblock %}
+{% block content %}
+<div class="max-w-xl mx-auto bg-white p-6 rounded-2xl ring-1 ring-gray-100">
+  <h1 class="text-xl font-bold mb-3">ยืนยันการลบ</h1>
+  <p>ต้องการลบร้าน “{{ restaurant.name }}” ใช่หรือไม่</p>
+  <form method="post" class="mt-5 flex gap-2">
+    {% csrf_token %}
+    <button type="submit" class="px-4 py-2 rounded-xl bg-red-600 text-white">ลบ</button>
+    <a href="{% url 'restaurants:admin_restaurant_list' %}" class="px-4 py-2 rounded-xl ring-1 ring-gray-200">ยกเลิก</a>
+  </form>
+</div>
+{% endblock %}

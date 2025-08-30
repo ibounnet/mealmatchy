@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+{% block title %}แก้ไขสูตรอาหาร{% endblock %}
+{% block content %}
+<div class="max-w-3xl mx-auto">
+  <h1 class="text-2xl font-bold text-gray-800 mb-6">แก้ไขสูตรอาหาร</h1>
+  <form method="POST" enctype="multipart/form-data" class="bg-white p-6 rounded-2xl ring-1 ring-gray-100 space-y-5">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+
+    <!-- ใช้บล็อกฟิลด์เดียวกับ add_recipe.html -->
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">ชื่อสูตร</label>
+      {{ form.title }}
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">แหล่งที่มา/ร้าน</label>
+      {{ form.restaurant_name }}
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">คำอธิบาย</label>
+      {{ form.description }}
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">ส่วนผสม</label>
+      {{ form.ingredients }}
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">วิธีทำ</label>
+      {{ form.steps }}
+    </div>
+
+    <div class="grid sm:grid-cols-3 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">เสิร์ฟ</label>
+        {{ form.servings }}
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">เวลาเตรียม</label>
+        {{ form.prep_minutes }}
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">เวลาปรุง</label>
+        {{ form.cook_minutes }}
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">รูปภาพ</label>
+      {{ form.image }}
+      {% if recipe.image %}
+        <p class="text-sm text-gray-600 mt-1">รูปเดิม: <a class="text-primary underline" href="{{ recipe.image.url }}" target="_blank">ดูรูป</a></p>
+      {% endif %}
+    </div>
+
+    <div class="flex items-center gap-3 pt-2">
+      <button class="px-4 py-2 rounded-xl bg-primary text-white hover:bg-primary-dark transition">บันทึกการเปลี่ยนแปลง</button>
+      <a href="{% url 'recipe_list' %}" class="px-4 py-2 rounded-xl ring-1 ring-gray-200 text-gray-700 hover:bg-gray-50">ยกเลิก</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

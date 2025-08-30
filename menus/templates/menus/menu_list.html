@@ -4,7 +4,8 @@
 <div class="max-w-5xl mx-auto">
   <div class="flex items-center justify-between mb-6">
     <h1 class="text-2xl font-bold text-gray-800">เมนูอาหาร</h1>
-    <a href="{% url 'add_menu' %}" class="inline-flex items-center px-4 py-2 rounded-xl bg-primary text-white hover:bg-primary-dark transition">
+    <a href="{% url 'menus:add_menu' %}"
+       class="inline-flex items-center px-4 py-2 rounded-xl bg-primary text-white hover:bg-primary-dark transition">
       + เพิ่มเมนู
     </a>
   </div>
@@ -22,12 +23,19 @@
             <div class="text-xs text-gray-500">ร้าน: {{ m.restaurant_name|default:"-" }}</div>
             <h3 class="font-semibold text-gray-900">{{ m.name }}</h3>
             <p class="text-sm text-gray-600 line-clamp-2">{{ m.description|default:"-" }}</p>
+
             <div class="flex items-center justify-between pt-2">
               <span class="font-bold text-primary-dark">{{ m.price }} บาท</span>
+
+              {# เงื่อนไขโชว์ปุ่ม (ตัวอย่าง: เจ้าของเมนูหรือแอดมิน) #}
+              {% if user.is_staff or m.created_by_id == user.id %}
               <div class="flex gap-2">
-                <a href="{% url 'edit_menu' m.pk %}" class="px-3 py-1.5 text-sm rounded-lg bg-white ring-1 ring-primary text-primary hover:bg-primary-light/40">แก้ไข</a>
-                <a href="{% url 'delete_menu' m.pk %}" class="px-3 py-1.5 text-sm rounded-lg bg-white ring-1 ring-red-300 text-red-600 hover:bg-red-50">ลบ</a>
+                <a href="{% url 'menus:edit_menu' m.pk %}"
+                   class="px-3 py-1.5 text-sm rounded-lg bg-white ring-1 ring-primary text-primary hover:bg-primary-light/40">แก้ไข</a>
+                <a href="{% url 'menus:delete_menu' m.pk %}"
+                   class="px-3 py-1.5 text-sm rounded-lg bg-white ring-1 ring-red-300 text-red-600 hover:bg-red-50">ลบ</a>
               </div>
+              {% endif %}
             </div>
           </div>
         </div>
@@ -35,8 +43,11 @@
     </div>
   {% else %}
     <div class="bg-white rounded-2xl p-8 text-center ring-1 ring-gray-100">
-      <p class="text-gray-600">ยังไม่มีเมนู ลองเพิ่มเมนูแรกของคุณดูนะ</p>
-      <a href="{% url 'add_menu' %}" class="mt-4 inline-flex items-center px-4 py-2 rounded-xl bg-primary text-white hover:bg-primary-dark transition">+ เพิ่มเมนู</a>
+      <p class="text-gray-600">ยังไม่มีเมนู ลองเพิ่มเมนูแรกของคุณ</p>
+      <a href="{% url 'menus:add_menu' %}"
+         class="mt-4 inline-flex items-center px-4 py-2 rounded-xl bg-primary text-white hover:bg-primary-dark transition">
+        + เพิ่มเมนู
+      </a>
     </div>
   {% endif %}
 </div>

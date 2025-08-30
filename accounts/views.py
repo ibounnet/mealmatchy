@@ -7,9 +7,26 @@ from django.contrib.auth.models import User
 from .forms import CustomUserCreationForm, UserUpdateForm, ProfileUpdateForm, LoginForm
 from .models import Profile
 
+from django.shortcuts import render
+from django.contrib.auth.decorators import login_required
+from menus.models import Menu  # ต้องมี Model นี้
+
 @login_required
 def home_view(request):
-    return render(request, 'accounts/home.html')
+    # รับงบจาก query string ?budget=50 (ถ้าไม่ใส่ให้ใช้ 50)
+    try:
+        budget = int(request.GET.get('budget', 50))
+    except ValueError:
+        budget = 50
+
+    # แนะนำเมนูที่ราคา <= งบ เรียงล่าสุดก่อน
+    menus = Menu.objects.filter(price__lte=budget).order_by('-created_at')[:12]
+
+    return render(request, 'accounts/home.html', {
+        'budget': budget,
+        'menus': menus,
+    })
+
 
 def register_view(request):
     if request.method == "POST":

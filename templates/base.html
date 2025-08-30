@@ -5,19 +5,24 @@
   <title>{% block title %}MealMatchy{% endblock %}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = { theme: { extend: { colors: { primary: { DEFAULT:'#f97316', dark:'#ea580c', light:'#fed7aa' }}}}};
-  </script>
+  <script>tailwind.config={theme:{extend:{colors:{primary:{DEFAULT:'#f97316',dark:'#ea580c',light:'#fff7ed'}}}}}</script>
 </head>
 <body class="bg-gray-50 text-gray-900">
   <nav class="bg-white border-b border-gray-100">
     <div class="max-w-6xl mx-auto px-4">
       <div class="flex items-center justify-between h-14">
-        <a href="/" class="font-bold text-primary">MealMatchy</a>
+        <a href="{% url 'home' %}" class="font-bold text-primary">MealMatchy</a>
         <div class="flex items-center gap-5 text-sm">
-          <a href="/accounts/home/" class="hover:text-primary">หน้าแรก</a>
-          <a href="/accounts/profile/" class="hover:text-primary">โปรไฟล์</a>
-          <a href="/accounts/logout/" class="px-3 py-1.5 rounded-lg bg-primary text-white hover:bg-primary-dark">ออกจากระบบ</a>
+          {% if user.is_authenticated %}
+            <a href="{% url 'home' %}" class="hover:text-primary">หน้าแรก</a>
+            <a href="{% url 'menus:menu_list' %}" class="hover:text-primary">เมนูอาหาร</a>
+            <a href="{% url 'restaurants:restaurant_list' %}" class="hover:text-primary">ร้านอาหาร</a>
+            <a href="{% url 'profile' %}" class="hover:text-primary">โปรไฟล์</a>
+            <a href="{% url 'logout' %}" class="px-3 py-1.5 rounded-lg bg-primary text-white hover:bg-primary-dark">ออกจากระบบ</a>
+          {% else %}
+            <a href="{% url 'login' %}" class="hover:text-primary">เข้าสู่ระบบ</a>
+            <a href="{% url 'register' %}" class="hover:text-primary">สมัครสมาชิก</a>
+          {% endif %}
         </div>
       </div>
     </div>

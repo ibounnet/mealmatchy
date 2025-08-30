@@ -7,7 +7,7 @@
   <form method="POST" class="flex items-center gap-3">
     {% csrf_token %}
     <button class="px-4 py-2 rounded-xl bg-red-600 text-white hover:bg-red-700">ยืนยันลบ</button>
-    <a href="{% url 'menu_list' %}" class="px-4 py-2 rounded-xl ring-1 ring-gray-200 text-gray-700 hover:bg-gray-50">ยกเลิก</a>
+    <a href="{% url 'menus:menu_list' %}" class="px-4 py-2 rounded-xl ring-1 ring-gray-200 text-gray-700 hover:bg-gray-50">ยกเลิก</a>
   </form>
 </div>
 {% endblock %}

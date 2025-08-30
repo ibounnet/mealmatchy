@@ -41,6 +41,9 @@ INSTALLED_APPS = [
     'widget_tweaks',
     'accounts.apps.AccountsConfig',
     'menus',
+    'recipes',
+    'restaurants',
+
 ]
 
 MIDDLEWARE = [
@@ -139,6 +142,7 @@ LOGIN_REDIRECT_URL = '/'
 
 LOGIN_URL = '/accounts/login/'
 LOGIN_REDIRECT_URL = '/menus/'
+LOGIN_REDIRECT_URL = '/accounts/home/'
 LOGOUT_REDIRECT_URL = '/accounts/login/'
 
 MEDIA_URL = '/media/'

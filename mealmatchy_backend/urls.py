@@ -9,10 +9,12 @@ urlpatterns = [
     path('', RedirectView.as_view(pattern_name='home', permanent=False)),  # หรือ menu_list ถ้าต้องการ
     path('admin/', admin.site.urls),
     path('accounts/', include('accounts.urls')),
-    path('menus/', include('menus.urls')),
+    path('menus/', include('menus.urls', namespace='menus')),
+    
+    path('recipes/', include('recipes.urls')),
+    path('restaurants/', include('restaurants.urls', namespace='restaurants')),
 
 
-    # ✅ เพิ่มสองบรรทัดนี้ให้ /register และ /login ใช้ได้ที่รูท
     path('register/', RedirectView.as_view(pattern_name='register', permanent=False)),
     path('login/',    RedirectView.as_view(pattern_name='login', permanent=False)),
     path('logout/', RedirectView.as_view(pattern_name='logout', permanent=False)),
