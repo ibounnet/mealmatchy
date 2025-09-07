@@ -11,30 +11,26 @@ from .forms import MenuForm
 from django.views.decorators.http import require_POST
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.conf import settings
-
+from .utils import filter_by_plan
 
 @login_required
 def menu_list(request):
-    # staff เห็นทั้งหมด, user เห็น APPROVED + ของตัวเอง
-    if request.user.is_staff:
-        qs = Menu.objects.all()
-    else:
-        qs = Menu.objects.filter(
-            Q(status=Menu.Status.APPROVED) | Q(created_by=request.user)
-        )
+    qs = Menu.objects.all().order_by('-created_at')
 
-    q = (request.GET.get('q') or '').strip()
-    if q:
-        qs = qs.filter(
-            Q(name__icontains=q) |
-            Q(description__icontains=q) |
-            Q(restaurant_name__icontains=q) |           # ชื่อร้านที่เก็บซ้ำ
-            Q(restaurant__name__icontains=q)            # ชื่อร้านจาก FK
-        )
+    # ถ้ามี plan ใน session ให้กรอง
+    plan = request.session.get('plan')
+    qs = filter_by_plan(qs, plan)
 
-    qs = qs.select_related('restaurant', 'created_by').order_by('-created_at')
-    menus = Paginator(qs, 12).get_page(request.GET.get('page', 1))
-    return render(request, 'menus/menu_list.html', {'menus': menus, 'q': q})
+    # ถ้ามี budget ใน query ให้กรองราคาไม่เกิน
+    budget = request.GET.get('budget') or (plan and plan.get('budget'))
+    if budget and str(budget).isdigit():
+        qs = qs.filter(price__lte=int(budget))
+
+    return render(request, 'menus/menu_list.html', {
+        'menus': qs,
+        'budget': budget or '',
+        'plan': plan or {},
+    })
 
 
 @login_required

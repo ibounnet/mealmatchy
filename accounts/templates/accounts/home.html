@@ -1,38 +1,140 @@
 {% extends 'base.html' %}
 {% block title %}หน้าแรก - MealMatchy{% endblock %}
-{% block content %}
-<div class="bg-white rounded-2xl ring-1 ring-gray-100 p-6">
-  <form method="get" class="flex items-end gap-3 mb-6">
-    <div>
-      <label class="block text-sm text-gray-600 mb-1">งบประมาณ (บาท)</label>
-      <input type="number" name="budget" value="{{ budget }}" min="0"
-             class="rounded-xl border border-gray-200 px-3 py-2 w-40" />
-    </div>
-    <button class="px-4 py-2 rounded-xl bg-primary text-white hover:bg-primary-dark">แนะนำเมนู</button>
-  </form>
 
-  <h2 class="text-xl font-bold mb-4">เมนูแนะนำ (≤ {{ budget }} บาท)</h2>
+{% block content %}
+
+<!-- ปุ่มเริ่มวางแผน (กึ่งกลางหน้า) -->
+<div class="flex items-center justify-center my-6">
+  <button id="openPlanModal"
+          class="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-primary text-white hover:bg-primary-dark shadow-sm">
+    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M6 2a1 1 0 0 1 1 1v1h10V3a1 1 0 1 1 2 0v1h1a2 2 0 0 1 2 2v3H1V6a2 2 0 0 1 2-2h1V3a1 1 0 1 1 2 0v1zM1 11h22v9a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2v-9zm7 3H6v2h2v-2z"/>
+    </svg>
+    เริ่มวางแผนมื้ออาหารเลย
+  </button>
+</div>
+
+<!-- เส้นคั่นเล็ก ๆ สวย ๆ -->
+<hr class="border-none h-px bg-gradient-to-r from-transparent via-orange-200 to-transparent mb-6">
+
+<!-- ตัวอย่างบล็อก “เมนูแนะนำในงบ” (ใช้ได้ถ้าคุณส่งตัวแปร menus จาก view) -->
+<div class="max-w-6xl mx-auto">
+  <h2 class="text-lg font-semibold text-gray-800 mb-2">
+    เมนูแนะนำในงบ (Budget Menu Highlight)
+  </h2>
 
   {% if menus %}
-    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
       {% for m in menus %}
-        <div class="bg-white ring-1 ring-gray-100 rounded-2xl overflow-hidden">
+        <div class="bg-white rounded-2xl ring-1 ring-gray-100 shadow-sm overflow-hidden">
           {% if m.image %}
-            <img src="{{ m.image.url }}" class="w-full h-40 object-cover" alt="{{ m.name }}">
+            <img src="{{ m.image.url }}" alt="{{ m.name }}" class="w-full h-44 object-cover">
           {% else %}
-            <div class="w-full h-40 bg-orange-50 flex items-center justify-center text-orange-500">ไม่มีรูป</div>
+            <div class="w-full h-44 bg-primary-light/40 flex items-center justify-center text-primary-dark">
+              ไม่มีรูป
+            </div>
           {% endif %}
-          <div class="p-4">
+          <div class="p-4 space-y-1">
             <div class="text-xs text-gray-500">ร้าน: {{ m.restaurant_name|default:"-" }}</div>
-            <div class="font-semibold">{{ m.name }}</div>
-            <div class="text-sm text-gray-600 line-clamp-2">{{ m.description|default:"-" }}</div>
-            <div class="mt-2 font-bold text-orange-600">{{ m.price }} บาท</div>
+            <div class="font-semibold text-gray-900">{{ m.name }}</div>
+            <div class="text-sm text-primary-dark font-bold">{{ m.price }} บาท</div>
           </div>
         </div>
       {% endfor %}
     </div>
   {% else %}
-    <div class="text-gray-600">ไม่พบเมนูในงบนี้</div>
+    <div class="text-gray-500">ยังไม่มีเมนูแนะนำ</div>
   {% endif %}
 </div>
+
+
+<!-- ========== MODAL: เริ่มวางแผนมื้ออาหาร (เฉพาะ 1 Day / 7 Day) ========== -->
+<div id="planModal" class="fixed inset-0 z-50 hidden">
+  <div class="absolute inset-0 bg-black/40" aria-hidden="true"></div>
+
+  <div class="relative max-w-lg mx-auto mt-16 bg-white rounded-2xl shadow-xl ring-1 ring-gray-100 p-8">
+    <div class="text-center mb-6">
+      <h2 class="text-2xl font-bold text-gray-800">Welcome to Mealmatchy</h2>
+      <p class="text-xl mt-1 text-gray-700">เริ่มวางแผนมื้ออาหาร</p>
+    </div>
+
+    <form method="post" action="{% url 'plan_start' %}">
+      {% csrf_token %}
+      <input type="hidden" name="phase" value="pre">
+      <input type="hidden" id="daysField" name="days" value="1">
+
+      <!-- เลือกจำนวนวัน (เฉพาะ 1 / 7) -->
+      <div class="flex items-center justify-center gap-3 mb-6">
+        <button type="button" data-days="1"
+                class="day-btn px-5 py-2 rounded-xl ring-1 ring-gray-200 text-gray-700 hover:bg-gray-50">
+          1 Day
+        </button>
+        <button type="button" data-days="7"
+                class="day-btn px-5 py-2 rounded-xl ring-1 ring-gray-200 text-gray-700 hover:bg-gray-50">
+          7 Day
+        </button>
+      </div>
+
+      <!-- วันที่เริ่มต้น -->
+      <div class="mb-4">
+        <label class="block text-sm text-gray-600 mb-1">วันที่เริ่มแผน</label>
+        <input type="date" id="startDate" name="start_date"
+               class="w-full rounded-xl ring-1 ring-gray-200 focus:ring-primary px-3 py-2 outline-none">
+      </div>
+
+      <!-- งบประมาณ -->
+      <div class="mb-6">
+        <label class="block text-sm text-gray-600 mb-1">งบประมาณ (บาท)</label>
+        <input type="number" name="budget" min="0" placeholder="เช่น 50"
+               class="w-full rounded-xl ring-1 ring-gray-200 focus:ring-primary px-3 py-2 outline-none">
+      </div>
+
+      <div class="flex justify-end gap-3">
+        <button type="button" id="closePlanModal"
+                class="px-4 py-2 rounded-xl bg-gray-100 text-gray-700 hover:bg-gray-200">
+          ยกเลิก
+        </button>
+        <button class="px-4 py-2 rounded-xl bg-primary text-white hover:bg-primary-dark">
+          ถัดไป
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  (function () {
+    const openBtn   = document.getElementById('openPlanModal');
+    const modal     = document.getElementById('planModal');
+    const closeBtn  = document.getElementById('closePlanModal');
+    const dayBtns   = document.querySelectorAll('.day-btn');
+    const daysField = document.getElementById('daysField');
+    const startDate = document.getElementById('startDate');
+
+    function openModal(){ modal.classList.remove('hidden'); }
+    function closeModal(){ modal.classList.add('hidden'); }
+
+    openBtn?.addEventListener('click', openModal);
+    closeBtn?.addEventListener('click', closeModal);
+    modal?.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+    // toggle 1 / 7 day
+    dayBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const v = btn.getAttribute('data-days') || '1';
+        daysField.value = v;
+        dayBtns.forEach(b => b.classList.remove('bg-primary','text-white','ring-primary'));
+        btn.classList.add('bg-primary','text-white','ring-primary');
+      });
+    });
+    // default = 1 Day
+    dayBtns[0]?.classList.add('bg-primary','text-white','ring-primary');
+
+    // min & default start date = today
+    const t = new Date();
+    const iso = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
+    startDate.min = iso; startDate.value = iso;
+  })();
+</script>
+
 {% endblock %}

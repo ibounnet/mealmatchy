@@ -5,12 +5,22 @@
   <title>{% block title %}MealMatchy{% endblock %}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <script src="https://cdn.tailwindcss.com"></script>
-  <script>tailwind.config={theme:{extend:{colors:{primary:{DEFAULT:'#f97316',dark:'#ea580c',light:'#fff7ed'}}}}}</script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: { primary: { DEFAULT:'#f97316', dark:'#ea580c', light:'#fff7ed' } },
+          borderRadius: { xl: '0.75rem' },
+          boxShadow: { card:'0 8px 24px rgba(0,0,0,.06)' }
+        }
+      }
+    };
+  </script>
 </head>
 <body class="bg-gray-50 text-gray-900">
   <nav class="bg-white border-b border-gray-100">
     <div class="max-w-6xl mx-auto px-4">
-      <div class="flex items-center justify-between h-14">
+      <div class="h-14 flex items-center justify-between">
         <a href="{% url 'home' %}" class="font-bold text-primary">MealMatchy</a>
         <div class="flex items-center gap-5 text-sm">
           {% if user.is_authenticated %}
@@ -21,7 +31,7 @@
             <a href="{% url 'logout' %}" class="px-3 py-1.5 rounded-lg bg-primary text-white hover:bg-primary-dark">ออกจากระบบ</a>
           {% else %}
             <a href="{% url 'login' %}" class="hover:text-primary">เข้าสู่ระบบ</a>
-            <a href="{% url 'register' %}" class="hover:text-primary">สมัครสมาชิก</a>
+            <a href="{% url 'register' %}" class="px-3 py-1.5 rounded-lg bg-primary text-white hover:bg-primary-dark">สมัครสมาชิก</a>
           {% endif %}
         </div>
       </div>

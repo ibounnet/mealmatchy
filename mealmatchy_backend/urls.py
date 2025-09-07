@@ -9,10 +9,15 @@ urlpatterns = [
     path('', RedirectView.as_view(pattern_name='home', permanent=False)),  # หรือ menu_list ถ้าต้องการ
     path('admin/', admin.site.urls),
     path('accounts/', include('accounts.urls')),
-    path('menus/', include('menus.urls', namespace='menus')),
+    path('menus/', include(('menus.urls', 'menus'), namespace='menus')),
+
+    
+    path('plan/',     include(('plan.urls',  'plan'),  namespace='plan')),
+    path("budget/", include(("budgets.urls", "budgets"), namespace="budgets")),
+    path('', include(('budgets.urls', 'budgets'), namespace='budgets')),
     
     path('recipes/', include('recipes.urls')),
-    path('restaurants/', include('restaurants.urls', namespace='restaurants')),
+    path('restaurants/', include(('restaurants.urls', 'restaurants'), namespace='restaurants')),
 
 
     path('register/', RedirectView.as_view(pattern_name='register', permanent=False)),
