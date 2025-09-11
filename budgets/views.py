@@ -17,17 +17,49 @@ def _monday(date):
     return date - timedelta(days=date.weekday())
 
 
+def _parse_date_or_today(date_str: str | None):
+    """รับ YYYY-MM-DD -> date; ถ้า None/ว่าง ใช้วันนี้"""
+    if date_str:
+        return timezone.datetime.fromisoformat(date_str).date()
+    return timezone.localdate()
+
+
+def _default_budget_from_session(request) -> int:
+    """ดึงงบ default จากแผนใน session (ถ้ามี)"""
+    plan = request.session.get('plan') or {}
+    b = plan.get('budget')
+    try:
+        return int(b)
+    except Exception:
+        return 0
+
+
+def _safe_get_or_create_daily(request, use_date):
+    """
+    ดึง/สร้าง DailyBudget ของ user+date แบบปลอดภัย:
+    - ถ้ามีหลายแถว (ข้อมูลซ้ำ) จะเลือก id ต่ำสุดมาใช้
+    - ถ้าไม่มี -> สร้างใหม่ด้วยงบ default จาก session
+    """
+    qs = DailyBudget.objects.filter(user=request.user, date=use_date).order_by('id')
+    if qs.exists():
+        return qs.first(), False
+    return DailyBudget.objects.create(
+        user=request.user,
+        date=use_date,
+        amount=_default_budget_from_session(request)
+    ), True
+
+
+# ================= ตารางรายสัปดาห์ =================
+
 @login_required
 def budget_table(request):
     """
     ตารางรายสัปดาห์: แสดงเฉพาะวัน/งบที่ผู้ใช้ตั้งไว้จริงในสัปดาห์นั้น
     สลับสัปดาห์ด้วย ?start=YYYY-MM-DD (ควรเป็นวันจันทร์)
     """
-    start_str = request.GET.get('start')
-    if start_str:
-        start_date = timezone.datetime.fromisoformat(start_str).date()
-    else:
-        start_date = _monday(timezone.localdate())
+    start_date = _parse_date_or_today(request.GET.get('start'))
+    start_date = _monday(start_date)
     end_date = start_date + timedelta(days=6)
 
     budgets_qs = DailyBudget.objects.filter(
@@ -63,6 +95,8 @@ def budget_table(request):
     })
 
 
+# ================= ตั้ง/แก้งบรายวัน =================
+
 @login_required
 def set_daily_budget(request, date_str=None):
     """
@@ -71,57 +105,45 @@ def set_daily_budget(request, date_str=None):
     """
     initial_date = None
     if date_str:
-        initial_date = timezone.datetime.fromisoformat(date_str).date()
+        initial_date = _parse_date_or_today(date_str)
 
     if request.method == 'POST':
         form = DailyBudgetForm(request.POST)
         if form.is_valid():
             d = form.cleaned_data['date']
             amt = form.cleaned_data['amount']
-            DailyBudget.objects.update_or_create(
-                user=request.user, date=d, defaults={'amount': amt}
-            )
+            # อนุญาตมีซ้ำใน DB เก่า -> เลือกตัวแรกแล้วอัปเดต
+            obj, created = _safe_get_or_create_daily(request, d)
+            obj.amount = amt
+            obj.save(update_fields=['amount'])
             messages.success(request, f'บันทึกงบ {d} = {amt} บาท')
             return redirect(f"/budget/?start={_monday(d).isoformat()}")
     else:
         initial = {}
         if initial_date:
             initial['date'] = initial_date
-            try:
-                existing = DailyBudget.objects.get(user=request.user, date=initial_date)
-                initial['amount'] = existing.amount
-            except DailyBudget.DoesNotExist:
-                pass
+            exist = DailyBudget.objects.filter(user=request.user, date=initial_date).order_by('id').first()
+            if exist:
+                initial['amount'] = exist.amount
         form = DailyBudgetForm(initial=initial)
 
     return render(request, 'budgets/set_daily_budget.html', {'form': form})
 
+
+# ================= บันทึกค่าใช้จ่าย =================
 
 @login_required
 @require_POST
 def consume_menu(request, menu_id: int):
     """
     บันทึกการใช้จ่ายจาก 'เมนู' ในระบบ และผูกกับ DailyBudget ของวันนั้น
-    - ถ้าวันนั้นยังไม่มี DailyBudget → สร้างใหม่โดยใช้งบจาก session 'plan' ถ้ามี
+    - ถ้าวันนั้นยังไม่มี DailyBudget สร้างใหม่โดยใช้งบจาก session ถ้ามี
+    - ถ้าฐานข้อมูลมีงบวันนั้นมากกว่า 1 แถว จะหยิบแถวแรกมาใช้
     """
     menu = get_object_or_404(Menu, pk=menu_id)
+    use_date = _parse_date_or_today(request.POST.get('date'))
 
-    # วันที่ใช้ (รับจาก hidden input; ถ้าไม่ส่งมา ใช้วันนี้)
-    date_str = request.POST.get('date')
-    if date_str:
-        use_date = timezone.datetime.fromisoformat(date_str).date()
-    else:
-        use_date = timezone.localdate()
-
-    # ใช้งบ default จากแผน (ถ้ามี)
-    plan = request.session.get('plan')
-    default_amount = int(plan.get('budget', 0)) if plan else 0
-
-    daily_obj, _created = DailyBudget.objects.get_or_create(
-        user=request.user,
-        date=use_date,
-        defaults={'amount': default_amount}
-    )
+    daily_obj, _ = _safe_get_or_create_daily(request, use_date)
 
     BudgetSpend.objects.create(
         user=request.user,
@@ -145,26 +167,18 @@ def consume_outside(request):
     """
     บันทึกค่าใช้จ่ายอิสระ/กินข้างนอก
     """
-    amount = int(request.POST.get('amount', '0') or 0)
+    try:
+        amount = int(request.POST.get('amount', '0') or 0)
+    except Exception:
+        amount = 0
     note = (request.POST.get('note') or '').strip()
-    date_str = request.POST.get('date')
+    use_date = _parse_date_or_today(request.POST.get('date'))
 
     if amount <= 0:
         messages.error(request, "กรุณาระบุจำนวนเงินให้ถูกต้อง")
         return redirect('/budget/')
 
-    use_date = timezone.localdate()
-    if date_str:
-        use_date = timezone.datetime.fromisoformat(date_str).date()
-
-    # สร้าง DailyBudget ถ้ายังไม่มี (ใช้งบจาก session plan ถ้ามี)
-    plan = request.session.get('plan')
-    default_amount = int(plan.get('budget', 0)) if plan else 0
-    DailyBudget.objects.get_or_create(
-        user=request.user,
-        date=use_date,
-        defaults={'amount': default_amount}
-    )
+    _safe_get_or_create_daily(request, use_date)
 
     BudgetSpend.objects.create(
         user=request.user,
@@ -176,14 +190,16 @@ def consume_outside(request):
     return redirect(f"/budget/?start={_monday(use_date).isoformat()}")
 
 
+# ================= รายละเอียดรายวัน / ลบรายการ =================
+
 @login_required
 def day_detail(request, date_str):
     """
     หน้ารายละเอียดต่อวัน (งบ, ใช้ไป, คงเหลือ, รายการใช้จ่าย)
     """
-    the_date = timezone.datetime.fromisoformat(date_str).date()
+    the_date = _parse_date_or_today(date_str)
 
-    budget_obj = DailyBudget.objects.filter(user=request.user, date=the_date).first()
+    budget_obj = DailyBudget.objects.filter(user=request.user, date=the_date).order_by('id').first()
     budget_amount = budget_obj.amount if budget_obj else 0
 
     spends = (BudgetSpend.objects
@@ -214,22 +230,30 @@ def delete_spend(request, pk):
     return redirect('budgets:day_detail', date_str=d.isoformat())
 
 
+# ================= ตั้งงบทั้งสัปดาห์ =================
+
 @login_required
 @require_POST
 def set_week_same_amount(request):
     """
     ตั้งงบเท่ากันทั้งสัปดาห์ (จาก start=วันจันทร์ และ amount)
     """
-    amount = int(request.POST.get('amount', '0') or 0)
+    try:
+        amount = int(request.POST.get('amount', '0') or 0)
+    except Exception:
+        amount = 0
     start_str = request.POST.get('start')
+
     if amount <= 0 or not start_str:
         messages.error(request, 'กรุณากรอกจำนวนเงินและสัปดาห์ให้ถูกต้อง')
         return redirect('/budget/')
 
-    start_date = timezone.datetime.fromisoformat(start_str).date()
+    start_date = _parse_date_or_today(start_str)
     for i in range(7):
         d = start_date + timedelta(days=i)
-        DailyBudget.objects.update_or_create(user=request.user, date=d, defaults={'amount': amount})
+        obj, _ = _safe_get_or_create_daily(request, d)
+        obj.amount = amount
+        obj.save(update_fields=['amount'])
 
     messages.success(request, f'ตั้งงบ {amount} บาท/วัน สำหรับสัปดาห์ที่เริ่ม {start_date} เรียบร้อย')
     return redirect(f"/budget/?start={start_date.isoformat()}")

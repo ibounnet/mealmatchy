@@ -3,21 +3,19 @@
 
 {% block content %}
 
-<!-- ปุ่มเริ่มวางแผน (กึ่งกลางหน้า) -->
-<div class="flex items-center justify-center my-6">
+<div class="flex items-center justify-center my-8">
   <button id="openPlanModal"
-          class="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-primary text-white hover:bg-primary-dark shadow-sm">
-    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+          class="inline-flex items-center gap-3 px-8 py-4 rounded-2xl bg-primary text-white hover:bg-primary-dark shadow-lg text-lg font-bold">
+    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
       <path d="M6 2a1 1 0 0 1 1 1v1h10V3a1 1 0 1 1 2 0v1h1a2 2 0 0 1 2 2v3H1V6a2 2 0 0 1 2-2h1V3a1 1 0 1 1 2 0v1zM1 11h22v9a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2v-9zm7 3H6v2h2v-2z"/>
     </svg>
     เริ่มวางแผนมื้ออาหารเลย
   </button>
 </div>
 
-<!-- เส้นคั่นเล็ก ๆ สวย ๆ -->
+
 <hr class="border-none h-px bg-gradient-to-r from-transparent via-orange-200 to-transparent mb-6">
 
-<!-- ตัวอย่างบล็อก “เมนูแนะนำในงบ” (ใช้ได้ถ้าคุณส่งตัวแปร menus จาก view) -->
 <div class="max-w-6xl mx-auto">
   <h2 class="text-lg font-semibold text-gray-800 mb-2">
     เมนูแนะนำในงบ (Budget Menu Highlight)
@@ -48,7 +46,6 @@
 </div>
 
 
-<!-- ========== MODAL: เริ่มวางแผนมื้ออาหาร (เฉพาะ 1 Day / 7 Day) ========== -->
 <div id="planModal" class="fixed inset-0 z-50 hidden">
   <div class="absolute inset-0 bg-black/40" aria-hidden="true"></div>
 
@@ -63,7 +60,6 @@
       <input type="hidden" name="phase" value="pre">
       <input type="hidden" id="daysField" name="days" value="1">
 
-      <!-- เลือกจำนวนวัน (เฉพาะ 1 / 7) -->
       <div class="flex items-center justify-center gap-3 mb-6">
         <button type="button" data-days="1"
                 class="day-btn px-5 py-2 rounded-xl ring-1 ring-gray-200 text-gray-700 hover:bg-gray-50">
@@ -75,14 +71,12 @@
         </button>
       </div>
 
-      <!-- วันที่เริ่มต้น -->
       <div class="mb-4">
         <label class="block text-sm text-gray-600 mb-1">วันที่เริ่มแผน</label>
         <input type="date" id="startDate" name="start_date"
                class="w-full rounded-xl ring-1 ring-gray-200 focus:ring-primary px-3 py-2 outline-none">
       </div>
 
-      <!-- งบประมาณ -->
       <div class="mb-6">
         <label class="block text-sm text-gray-600 mb-1">งบประมาณ (บาท)</label>
         <input type="number" name="budget" min="0" placeholder="เช่น 50"

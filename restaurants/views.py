@@ -20,18 +20,20 @@ def restaurant_list(request):
 
 @login_required
 def restaurant_detail(request, pk):
-    r = get_object_or_404(Restaurant, pk=pk, is_active=True)
+    restaurant = get_object_or_404(Restaurant, pk=pk, is_active=True)
 
     if request.user.is_staff:
-        menu_qs = r.menus.all().select_related('created_by').order_by('-created_at')
+        menus = Menu.objects.filter(restaurant=restaurant).order_by('-created_at')
     else:
-        menu_qs = r.menus.filter(
-            Q(status=Menu.Status.APPROVED) | Q(created_by=request.user)
-        ).select_related('created_by').order_by('-created_at')
+        menus = (
+            Menu.objects.filter(restaurant=restaurant)
+            .filter(Q(status=Menu.Status.APPROVED) | Q(created_by=request.user))
+            .order_by('-created_at')
+        )
 
     return render(request, 'restaurants/restaurant_detail.html', {
-        'restaurant': r,
-        'menus': menu_qs,
+        'restaurant': restaurant,
+        'menus': menus,
     })
 
 @login_required

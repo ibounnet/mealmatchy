@@ -1,85 +1,74 @@
+# menus/utils.py
 from django.db.models import Q
-import re
 
-ALLERGY_KEY_MAP = {
-    # คำที่มักอยู่ใน ingredients
-    "กุ้ง": ["กุ้ง"],
-    "ไข่": ["ไข่"],
-    "นม": ["นม", "นมวัว", "นมสด", "ชีส", "เนย"],
-    "ถั่ว": ["ถั่ว", "ถั่วลิสง", "อัลมอนด์", "วอลนัท", "เม็ดมะม่วง"],
-    "แป้งสาลี": ["แป้งสาลี", "กลูเตน", "ซีอิ๊วขาว"],  # บางแบรนด์มีกลูเตน
-    "ทะเล (รวม)": ["กุ้ง", "ปลาหมึก", "หอย", "ปลา"],
+# คีย์เวิร์ดพื้นฐานสำหรับกรองวัตถุดิบ/ข้อจำกัด
+KW = {
+    # แพ้/ไม่กิน (allergies + dislikes)
+    "หมู": ["หมู", "หมูกรอบ", "หมูสับ", "สามชั้น", "pork", "เบคอน", "bacon"],
+    "ไก่": ["ไก่", "chicken"],
+    "เนื้อวัว": ["เนื้อ", "วัว", "beef"],
+    "กุ้ง": ["กุ้ง", "shrimp", "prawn"],
+    "ทะเล (รวม)": ["ทะเล", "ปลาหมึก", "หมึก", "หอย", "ปู", "ซีฟู้ด", "seafood", "squid", "crab", "clam"],
+    "เห็ด": ["เห็ด", "mushroom"],
+    "หัวหอม": ["หัวหอม", "หอมใหญ่", "หอมแดง", "onion"],
+    "เครื่องใน": ["เครื่องใน", "ตับ", "ไส้", "กึ๋น", "เครื่องในไก่", "เครื่องในหมู", "offal", "liver"],
+    "ผักชี": ["ผักชี", "coriander", "cilantro"],
+    "กระเทียม": ["กระเทียม", "garlic"],
+    "นม": ["นม", "ชีส", "เนย", "milk", "cheese", "butter", "cream", "โยเกิร์ต", "yogurt"],
+    "ไข่": ["ไข่", "egg"],
+    "แป้งสาลี": ["แป้งสาลี", "แป้ง", "wheat", "กลูเตน", "gluten", "บะหมี่", "ขนมปัง", "แป้งทอด"],
+    "ถั่ว": ["ถั่ว", "peanut", "ถั่วลิสง", "อัลมอนด์", "almond", "nut"],
 }
 
-DISLIKE_KEY_MAP = {
-    "หมู": ["หมู"],
-    "ไก่": ["ไก่"],
-    "เนื้อวัว": ["เนื้อวัว", "วัว", "เนื้อ"],
-    "เห็ด": ["เห็ด"],
-    "หัวหอม": ["หอม", "หอมหัวใหญ่", "หอมแดง"],
-    "เครื่องใน": ["เครื่องใน", "ตับ", "ไส้", "หัวใจ"],
-    "ผักชี": ["ผักชี"],
-    "กระเทียม": ["กระเทียม"],
+# ศาสนา/วัฒนธรรม (ใช้การอนุมานอย่างง่าย)
+RELIGION_BLOCK = {
+    "ฮาลาล": ["หมู", "แอลกอฮอล์", "เบคอน", "pork", "alcohol", "ไวน์", "เบียร์"],
+    "อาหารเจ": ["หมู","ไก่","เนื้อวัว","กุ้ง","ทะเล (รวม)","ไข่","นม","cheese","butter","egg","milk","meat"],
+    "มังสวิรัติ": ["หมู","ไก่","เนื้อวัว","กุ้ง","ทะเล (รวม)","meat","pork","beef","chicken","seafood"],
+    "หลีกเลี่ยงแอลกอฮอล์": ["แอลกอฮอล์","alcohol","ไวน์","เบียร์","rum","whisky","sake"],
 }
 
-def build_exclude_q(ingredients_field, keywords):
-    """
-    สร้าง Q สำหรับ exclude ถ้า ingredients มีคำที่ไม่อนุญาต
-    """
+def _build_exclude_q(words):
+    """สร้าง Q สำหรับ 'ไม่ให้มี' คีย์เวิร์ดในชื่อ/คำอธิบาย/ชื่อร้าน"""
     q = Q()
-    for kw in keywords:
-        q |= Q(**{f"{ingredients_field}__iregex": rf"(^|,|\s){re.escape(kw)}(,|\s|$)"})
+    for w in set(words):
+        q |= Q(name__icontains=w) | Q(description__icontains=w) | Q(restaurant_name__icontains=w)
     return q
 
-def filter_by_plan(queryset, plan: dict):
+def filter_by_plan(qs, plan: dict | None):
     """
-    รับ QuerySet ของ Menu และ dict จาก session['plan']
-    คืน QuerySet ที่ถูกกรองแล้ว
+    กรอง QuerySet ของ Menu ตามแผนใน session
+    - budget: ราคาไม่เกิน
+    - allergies, dislikes: ไม่ให้พบคีย์เวิร์ดที่เกี่ยวข้อง
+    - religions: ตัดคีย์เวิร์ดที่ต้องหลีกเลี่ยงตามศาสนา/วัฒนธรรม
     """
     if not plan:
-        return queryset
+        return qs
 
-    allergies = plan.get('allergies', [])
-    dislikes  = plan.get('dislikes', [])
-    religions = plan.get('religions', [])
-    extra     = plan.get('extra', {}) or {}
+    # 1) งบประมาณ
+    budget = plan.get("budget")
+    if budget and str(budget).isdigit():
+        qs = qs.filter(price__lte=int(budget))
 
-    # รวมคีย์เวิร์ดจาก allergies + extra allergy
-    allergy_words = []
-    for a in allergies:
-        allergy_words += ALLERGY_KEY_MAP.get(a, [a])
-    if extra.get('allergy'):
-        allergy_words += [w.strip() for w in extra['allergy'].split(',') if w.strip()]
+    # 2) รวมคีย์เวิร์ดที่ต้องตัดทิ้งจาก allergies + dislikes
+    ban = []
+    for key in (plan.get("allergies") or []) + (plan.get("dislikes") or []):
+        ban += KW.get(key, [key])
 
-    dislike_words = []
-    for d in dislikes:
-        dislike_words += DISLIKE_KEY_MAP.get(d, [d])
-    if extra.get('dislike'):
-        dislike_words += [w.strip() for w in extra['dislike'].split(',') if w.strip()]
+    # 3) ศาสนา/วัฒนธรรม
+    for r in plan.get("religions") or []:
+        ban += RELIGION_BLOCK.get(r, [])
 
-    # กรองตามศาสนา/วัฒนธรรม
-    # - ฮาลาล: ต้องไม่ใช่หมู/แอลกอฮอล์ และควรติ๊ก is_halal ไว้ตอนใส่ข้อมูล
-    if "ฮาลาล" in religions:
-        queryset = queryset.filter(is_halal=True, no_alcohol=True)
-        # กันเคสที่ miss-flag โดยดูคำ “หมู”
-        queryset = queryset.exclude(build_exclude_q("ingredients", ["หมู"]))
+    # 4) extra free text
+    extra = plan.get("extra") or {}
+    for e in (extra.get("allergy") or "").split(","):
+        if e.strip():
+            ban.append(e.strip())
+    for e in (extra.get("dislike") or "").split(","):
+        if e.strip():
+            ban.append(e.strip())
 
-    # มังสวิรัติ: ไม่มีเนื้อสัตว์แดง/ขาว อนุญาตไข่/นม
-    if "มังสวิรัติ" in religions:
-        queryset = queryset.filter(is_vegetarian=True, no_alcohol=True)
+    if ban:
+        qs = qs.exclude(_build_exclude_q(ban))
 
-    # อาหารเจ/วีแกน: ไม่มีผลิตภัณฑ์สัตว์ทุกชนิด
-    if "อาหารเจ" in religions:
-        queryset = queryset.filter(is_vegan=True, no_alcohol=True)
-
-    # หลีกเลี่ยงแอลกอฮอล์
-    if "หลีกเลี่ยงแอลกอฮอล์" in religions:
-        queryset = queryset.filter(no_alcohol=True)
-
-    # แพ้/ไม่ชอบ → exclude ถ้ามีคำที่ชน
-    if allergy_words:
-        queryset = queryset.exclude(build_exclude_q("ingredients", allergy_words))
-    if dislike_words:
-        queryset = queryset.exclude(build_exclude_q("ingredients", dislike_words))
-
-    return queryset
+    return qs

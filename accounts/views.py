@@ -3,29 +3,47 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
-from .forms import CustomUserCreationForm, UserUpdateForm, ProfileUpdateForm, LoginForm
+
+from .forms import (
+    CustomUserCreationForm,
+    UserUpdateForm,
+    ProfileUpdateForm,
+    LoginForm,
+)
 from .models import Profile
 from menus.models import Menu
 
 
-# ---------- HOME ----------
+# ====================== HOME ======================
+
 @login_required
 def home_view(request):
-    # อ่านงบจาก query (?budget=50) ค่าเริ่มต้น 50
+    """
+    หน้าแรก: แสดงปุ่ม 'เริ่มวางแผนมื้ออาหาร' และเมนูแนะนำตามงบ
+    อ่านงบจาก query string ?budget=50 (default = 50)
+    """
     try:
         budget = int(request.GET.get('budget', 50))
-    except ValueError:
+    except (TypeError, ValueError):
         budget = 50
-    menus = Menu.objects.filter(price__lte=budget).order_by('-created_at')[:12]
-    return render(request, 'accounts/home.html', {'budget': budget, 'menus': menus})
+
+    menus = (
+        Menu.objects.filter(price__lte=budget)
+        .order_by('-created_at')[:12]
+    )
+    return render(request, 'accounts/home.html', {
+        'budget': budget,
+        'menus': menus,
+    })
 
 
-# ---------- AUTH ----------
+# ====================== AUTH ======================
+
 def register_view(request):
     if request.method == "POST":
         form = CustomUserCreationForm(request.POST)
         if form.is_valid():
-            form.save()
+            user = form.save()
             messages.success(request, "สมัครสมาชิกสำเร็จ! ลองล็อกอินได้เลย")
             return redirect('login')
         messages.error(request, "กรุณาตรวจสอบข้อมูลให้ถูกต้อง")
@@ -51,10 +69,15 @@ def logout_view(request):
     return redirect('login')
 
 
-# ---------- PROFILE ----------
+# ====================== PROFILE ======================
+
 @login_required
 def profile_view(request):
+    """
+    จัดการโปรไฟล์ผู้ใช้ (ชื่อ-อีเมล + รูปโปรไฟล์)
+    """
     profile, _ = Profile.objects.get_or_create(user=request.user)
+
     if request.method == 'POST':
         uform = UserUpdateForm(request.POST, instance=request.user)
         pform = ProfileUpdateForm(request.POST, request.FILES, instance=profile)
@@ -67,32 +90,39 @@ def profile_view(request):
     else:
         uform = UserUpdateForm(instance=request.user)
         pform = ProfileUpdateForm(instance=profile)
-    return render(request, 'accounts/profile.html', {'uform': uform, 'pform': pform, 'profile': profile})
+
+    return render(request, 'accounts/profile.html', {
+        'uform': uform,
+        'pform': pform,
+        'profile': profile,
+    })
 
 
-# ---------- วางแผนมื้ออาหาร ----------
+# ====================== MEAL PLAN FLOW ======================
+
 @login_required
 def plan_start(request):
     """
-    หน้าเริ่มวางแผน (เลือกจำนวนวัน, วันที่เริ่ม, งบประมาณ)
-    POST -> redirect ไปหน้าข้อจำกัด (plan_diet)
+    หน้า popup/ฟอร์มเริ่มวางแผน (เลือกจำนวนวัน 1/7, วันที่เริ่ม, งบประมาณ)
+    POST -> ส่งค่าไปหน้าข้อจำกัด (plan_diet) ผ่าน query string
     """
     if request.method == 'POST':
         days = request.POST.get('days', '1')
         budget = request.POST.get('budget', '50')
         start_date = request.POST.get('start_date', '')
-        # ส่งค่าไปหน้าข้อจำกัดด้วย query string
         return redirect(f"/accounts/plan/diet/?days={days}&budget={budget}&start_date={start_date}")
+
+    # GET: แสดงฟอร์มเริ่มวางแผน (ใช้ template accounts/plan_start.html)
     return render(request, 'accounts/plan_start.html')
 
 
 @login_required
 def plan_diet(request):
     """
-    หน้าเลือกข้อจำกัดอาหาร: แพ้/ไม่ชอบ/ศาสนา
-    POST -> เก็บแผนลง session แล้วพาไปหน้า 'plan:summary'
+    หน้าเลือกข้อจำกัดอาหาร (แพ้/ไม่ชอบ/ศาสนา)
+    POST -> เก็บข้อมูลลง session['plan'] แล้วพาไปหน้า 'plan:summary'
     """
-    # รับค่าที่ส่งมาจาก plan_start (ผ่าน query string)
+    # ค่าที่ส่งมาจาก plan_start
     days = request.GET.get('days', '1')
     budget = request.GET.get('budget', '50')
     start_date = request.GET.get('start_date', '')
@@ -107,7 +137,6 @@ def plan_diet(request):
         dislikes  = request.POST.getlist('dislikes')
         religions = request.POST.getlist('religions')
 
-        # เก็บ session สำหรับใช้คัดกรองเมนู/สรุปแผน/ทำตารางงบ
         request.session['plan'] = {
             'days': int(request.POST.get('days', '1') or 1),
             'budget': int(request.POST.get('budget', '50') or 50),
@@ -121,9 +150,10 @@ def plan_diet(request):
                 'religion': request.POST.get('extra_religion', '').strip(),
             }
         }
-        # >>> เปลี่ยนปลายทาง ให้ไปหน้าแผนสรุป <<<
+        # ไปหน้าแผนสรุป (app ชื่อ plan, urlname = summary)
         return redirect('plan:summary')
 
+    # GET: แสดงฟอร์มข้อจำกัด
     return render(request, 'accounts/plan_diet.html', {
         'days': days,
         'budget': budget,
