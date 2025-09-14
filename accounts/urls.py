@@ -3,8 +3,6 @@ from django.urls import path
 from .views import (
     home_view, register_view, login_view, logout_view,
     profile_view,
-    plan_start,    # ✅ มีจริงใน views
-    plan_diet,     # ✅ มีจริงใน views
 )
 
 urlpatterns = [
@@ -16,7 +14,5 @@ urlpatterns = [
 
     path('profile/', profile_view, name='profile'),
 
-    # วางแผนมื้ออาหาร
-    path('plan/start/', plan_start, name='plan_start'),
-    path('plan/diet/',  plan_diet,  name='plan_diet'),
+    
 ]

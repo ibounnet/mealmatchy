@@ -1,47 +1,36 @@
 {% extends "base.html" %}
 {% block title %}ตารางงบรายสัปดาห์{% endblock %}
-
 {% block content %}
 <div class="max-w-6xl mx-auto">
 
-  {# flash messages #}
   {% if messages %}
     <div class="space-y-2 mb-4">
       {% for message in messages %}
-        <div class="px-4 py-3 rounded-xl
-          {% if message.tags == 'success' %} bg-green-50 text-green-700
-          {% elif message.tags == 'error' %} bg-red-50 text-red-700
-          {% else %} bg-gray-100 text-gray-700 {% endif %}">
+        <div class="px-4 py-3 rounded-xl {% if message.tags == 'success' %}bg-green-50 text-green-700{% elif message.tags == 'error' %}bg-red-50 text-red-700{% else %}bg-gray-100 text-gray-700{% endif %}">
           {{ message }}
         </div>
       {% endfor %}
     </div>
   {% endif %}
 
-  <div class="flex items-center justify-between mb-4">
-    <h1 class="text-2xl font-bold text-gray-800">ตารางงบรายสัปดาห์</h1>
-
-    <form method="post" action="{% url 'budgets:set_week_same_amount' %}" class="flex items-center gap-2">
-      {% csrf_token %}
-      <input type="hidden" name="start" value="{{ start_date|date:'Y-m-d' }}">
-      <input type="number" name="amount" min="0" placeholder="งบ/วัน"
-             class="w-32 px-3 py-2 rounded-xl ring-1 ring-gray-200">
-      <button class="px-3 py-2 rounded-xl bg-primary text-white hover:bg-primary-dark">
-        ตั้งงบทั้งสัปดาห์
-      </button>
-    </form>
+  <div class="flex items-center justify-between mb-3">
+    <h1 class="text-2xl font-bold">ตารางงบรายสัปดาห์</h1>
+    <div class="flex gap-2">
+      {% if from_plan %}
+        <a href="/plan/summary/" class="px-3 py-2 rounded-xl ring-1 ring-gray-200 hover:bg-gray-50">กลับไปเลือกเมนู</a>
+      {% endif %}
+      <a href="/menus/" class="px-3 py-2 rounded-xl bg-primary text-white hover:bg-primary-dark">ไปหน้าเมนูทั้งหมด</a>
+    </div>
   </div>
 
   <div class="flex items-center gap-2 mb-3 text-sm">
-    <a class="px-3 py-1.5 rounded-lg ring-1 ring-gray-200 hover:bg-gray-50"
-       href="{% url 'budgets:home' %}?start={{ prev_start|date:'Y-m-d' }}">« สัปดาห์ก่อน</a>
-
-    <div class="px-3 py-1.5">
-      {{ start_date|date:"Y-m-d" }} – {{ end_date|date:"Y-m-d" }}
-    </div>
-
-    <a class="px-3 py-1.5 rounded-lg ring-1 ring-gray-200 hover:bg-gray-50"
-       href="{% url 'budgets:home' %}?start={{ next_start|date:'Y-m-d' }}">สัปดาห์ถัดไป »</a>
+    {% if not restrict %}
+      <a class="px-3 py-1.5 rounded-lg ring-1 ring-gray-200 hover:bg-gray-50" href="{% url 'budgets:home' %}?start={{ prev_start|date:'Y-m-d' }}">« สัปดาห์ก่อน</a>
+    {% endif %}
+    <div class="px-3 py-1.5">{{ start_date|date:"Y-m-d" }} – {{ end_date|date:"Y-m-d" }}</div>
+    {% if not restrict %}
+      <a class="px-3 py-1.5 rounded-lg ring-1 ring-gray-200 hover:bg-gray-50" href="{% url 'budgets:home' %}?start={{ next_start|date:'Y-m-d' }}">สัปดาห์ถัดไป »</a>
+    {% endif %}
   </div>
 
   <div class="overflow-x-auto bg-white rounded-2xl ring-1 ring-gray-100">
@@ -61,21 +50,22 @@
           <tr class="border-t align-top">
             <td class="px-4 py-3">
               <div class="font-medium">{{ row.date|date:"Y-m-d" }}</div>
-              <a class="text-primary hover:underline text-xs"
-                 href="{% url 'budgets:day_detail' row.date|date:'Y-m-d' %}">ดูรายละเอียด</a>
+              <a class="text-primary hover:underline text-xs" href="{% url 'budgets:day_detail' row.date|date:'Y-m-d' %}">ดูรายละเอียด</a>
             </td>
             <td class="px-4 py-3">{{ row.budget_amount }}</td>
             <td class="px-4 py-3">{{ row.spent_amount }}</td>
-            <td class="px-4 py-3">{{ row.remain_amount }}</td>
+            <td class="px-4 py-3">
+              {% if row.remain_amount < 0 %}
+                <span class="text-red-600 font-semibold">{{ row.remain_amount }}</span>
+              {% else %}
+                {{ row.remain_amount }}
+              {% endif %}
+            </td>
             <td class="px-4 py-3">
               <ul class="list-disc list-inside space-y-1">
                 {% for s in row.spends %}
                   <li>
-                    {% if s.menu %}
-                      <span class="font-medium">{{ s.menu.name }}</span>
-                    {% else %}
-                      รายการ
-                    {% endif %}
+                    {% if s.menu %}<span class="font-medium">{{ s.menu.name }}</span>{% else %}รายการ{% endif %}
                     <span class="text-gray-500">— {{ s.amount }} ฿</span>
                   </li>
                 {% empty %}
@@ -84,18 +74,12 @@
               </ul>
             </td>
             <td class="px-4 py-3">
-              <a href="{% url 'budgets:set_daily_with_date' row.date|date:'Y-m-d' %}"
-                 class="px-3 py-1.5 rounded-lg ring-1 ring-gray-200 hover:bg-gray-50">
-                ตั้ง/แก้งบ
-              </a>
+              <!-- ไปหน้าแก้งบของวันนั้น (ยังคงแก้ได้) -->
+              <a href="{% url 'budgets:set_daily_with_date' row.date|date:'Y-m-d' %}" class="px-3 py-1.5 rounded-lg ring-1 ring-gray-200 hover:bg-gray-50">แก้งบ</a>
             </td>
           </tr>
         {% empty %}
-          <tr>
-            <td colspan="6" class="px-4 py-6 text-center text-gray-500">
-              ยังไม่มีการตั้งงบในสัปดาห์นี้ • กำหนดงบทั้งสัปดาห์จากกล่องด้านบนได้เลย
-            </td>
-          </tr>
+          <tr><td colspan="6" class="px-4 py-6 text-center text-gray-500">ยังไม่มีรายการในช่วงนี้</td></tr>
         {% endfor %}
       </tbody>
     </table>

@@ -12,7 +12,7 @@ urlpatterns = [
     path('menus/', include(('menus.urls', 'menus'), namespace='menus')),
 
     
-    path('plan/',     include(('plan.urls',  'plan'),  namespace='plan')),
+    path("plan/", include(("plan.urls", "plan"), namespace="plan")),
     path("budget/", include(("budgets.urls", "budgets"), namespace="budgets")),
     path('', include(('budgets.urls', 'budgets'), namespace='budgets')),
     

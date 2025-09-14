@@ -13,7 +13,6 @@
   </button>
 </div>
 
-
 <hr class="border-none h-px bg-gradient-to-r from-transparent via-orange-200 to-transparent mb-6">
 
 <div class="max-w-6xl mx-auto">
@@ -45,7 +44,7 @@
   {% endif %}
 </div>
 
-
+<!-- MODAL: เริ่มวางแผน -->
 <div id="planModal" class="fixed inset-0 z-50 hidden">
   <div class="absolute inset-0 bg-black/40" aria-hidden="true"></div>
 
@@ -55,9 +54,9 @@
       <p class="text-xl mt-1 text-gray-700">เริ่มวางแผนมื้ออาหาร</p>
     </div>
 
-    <form method="post" action="{% url 'plan_start' %}">
+    <!-- เปลี่ยน action ให้ถูกต้อง -->
+    <form method="post" action="{% url 'plan:start' %}">
       {% csrf_token %}
-      <input type="hidden" name="phase" value="pre">
       <input type="hidden" id="daysField" name="days" value="1">
 
       <div class="flex items-center justify-center gap-3 mb-6">
@@ -112,7 +111,6 @@
     closeBtn?.addEventListener('click', closeModal);
     modal?.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
 
-    // toggle 1 / 7 day
     dayBtns.forEach(btn => {
       btn.addEventListener('click', () => {
         const v = btn.getAttribute('data-days') || '1';
@@ -121,10 +119,8 @@
         btn.classList.add('bg-primary','text-white','ring-primary');
       });
     });
-    // default = 1 Day
     dayBtns[0]?.classList.add('bg-primary','text-white','ring-primary');
 
-    // min & default start date = today
     const t = new Date();
     const iso = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
     startDate.min = iso; startDate.value = iso;

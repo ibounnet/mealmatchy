@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}ข้อจำกัดอาหาร - MealMatchy{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto bg-white rounded-2xl p-6 ring-1 ring-gray-100">
+  <h1 class="text-2xl font-bold text-gray-800 mb-1">Welcome to Mealmatchy</h1>
+  <p class="text-gray-500 mb-6">ข้อจำกัดด้านอาหาร (Dietary Restrictions)</p>
+
+  <form method="post" action="{% url 'plan:diet' %}" class="space-y-8">
+    {% csrf_token %}
+
+    <!-- แพ้อาหาร -->
+    <div>
+      <div class="font-semibold text-gray-800 mb-2">วัตถุดิบที่แพ้</div>
+      <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {% for item in allergy_choices %}
+        <label class="inline-flex items-center gap-2">
+          <input type="checkbox"
+                 name="allergies"
+                 value="{{ item }}"
+                 class="rounded text-primary"
+                 {% if plan.allergies and item in plan.allergies %}checked{% endif %}>
+          <span>{{ item }}</span>
+        </label>
+        {% endfor %}
+      </div>
+      <input type="text"
+             name="extra_allergy"
+             placeholder="อื่น ๆ (พิมพ์เพิ่ม)"
+             value="{{ plan.extra.allergy|default_if_none:'' }}"
+             class="mt-2 w-full rounded-xl ring-1 ring-gray-200 px-3 py-2">
+    </div>
+
+    <!-- ไม่ชอบ -->
+    <div>
+      <div class="font-semibold text-gray-800 mb-2">วัตถุดิบที่ไม่ต้องการ</div>
+      <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {% for item in dislike_choices %}
+        <label class="inline-flex items-center gap-2">
+          <input type="checkbox"
+                 name="dislikes"
+                 value="{{ item }}"
+                 class="rounded text-primary"
+                 {% if plan.dislikes and item in plan.dislikes %}checked{% endif %}>
+          <span>{{ item }}</span>
+        </label>
+        {% endfor %}
+      </div>
+      <input type="text"
+             name="extra_dislike"
+             placeholder="อื่น ๆ (พิมพ์เพิ่ม)"
+             value="{{ plan.extra.dislike|default_if_none:'' }}"
+             class="mt-2 w-full rounded-xl ring-1 ring-gray-200 px-3 py-2">
+    </div>
+
+    <!-- ศาสนา/วัฒนธรรม -->
+    <div>
+      <div class="font-semibold text-gray-800 mb-2">ข้อจำกัดด้านศาสนา / วัฒนธรรม</div>
+      <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {% for item in religion_choices %}
+        <label class="inline-flex items-center gap-2">
+          <input type="checkbox"
+                 name="religions"
+                 value="{{ item }}"
+                 class="rounded text-primary"
+                 {% if plan.religions and item in plan.religions %}checked{% endif %}>
+          <span>{{ item }}</span>
+        </label>
+        {% endfor %}
+      </div>
+      <input type="text"
+             name="extra_religion"
+             placeholder="อื่น ๆ (พิมพ์เพิ่ม)"
+             value="{{ plan.extra.religion|default_if_none:'' }}"
+             class="mt-2 w-full rounded-xl ring-1 ring-gray-200 px-3 py-2">
+    </div>
+
+    <!-- สรุปค่าหลักจากแผน -->
+    <div class="text-sm text-gray-600 bg-orange-50 rounded-xl p-3">
+      เริ่มวันที่: <span class="font-medium">{{ plan.start_date|default:"-" }}</span> •
+      จำนวนวัน: <span class="font-medium">{{ plan.days|default:"1" }}</span> •
+      งบประมาณ/วัน: <span class="font-medium text-primary">{{ plan.budget|default:"50" }} บาท</span>
+    </div>
+
+    <div class="flex justify-between items-center">
+      <a href="{% url 'plan:start' %}"
+         class="px-4 py-2 rounded-xl bg-gray-100 text-gray-700 hover:bg-gray-200">
+        ย้อนกลับ
+      </a>
+      <button class="px-4 py-2 rounded-xl bg-primary text-white hover:bg-primary-dark">
+        ไปสรุปแผน
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}
