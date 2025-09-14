@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% block title %}จัดการร้านอาหาร (แอดมิน){% endblock %}
+{% block title %}จัดการร้านอาหาร (แอดมิน) | MealMatchy{% endblock %}
 {% block content %}
 <div class="max-w-6xl mx-auto">
   <div class="flex items-center justify-between mb-4">
@@ -21,26 +21,40 @@
   <div class="divide-y">
     {% for r in restaurants %}
       <div class="py-3 flex items-center justify-between">
-        <div>
-          <div class="font-semibold">{{ r.name }}</div>
-          <div class="text-sm text-gray-600">{{ r.location|default:"-" }}</div>
+        <div class="min-w-0">
+          <div class="font-semibold truncate">{{ r.name }}</div>
+          <div class="text-sm text-gray-600 truncate">{{ r.location|default:"-" }}</div>
           <div class="text-xs {% if r.is_active %}text-green-600{% else %}text-orange-600{% endif %}">
             {% if r.is_active %}อนุมัติแล้ว{% else %}รออนุมัติ{% endif %}
             {% if r.created_by %} • ผู้ขอ: {{ r.created_by.username }}{% endif %}
           </div>
         </div>
-        <div class="flex gap-2">
+        <div class="flex gap-2 items-center">
           {% if not r.is_active %}
-            <a class="px-3 py-1 rounded-xl bg-green-600 text-white"
-               href="{% url 'restaurants:admin_approve_restaurant' r.pk %}">อนุมัติ</a>
+            <form method="post" action="{% url 'restaurants:admin_approve_restaurant' r.pk %}">
+              {% csrf_token %}
+              <button type="submit" class="px-3 py-1 rounded-xl bg-green-600 text-white">
+                อนุมัติ
+              </button>
+            </form>
           {% else %}
-            <a class="px-3 py-1 rounded-xl bg-yellow-500 text-white"
-               href="{% url 'restaurants:admin_reject_restaurant' r.pk %}">ปิดการแสดงผล</a>
+            <form method="post" action="{% url 'restaurants:admin_reject_restaurant' r.pk %}">
+              {% csrf_token %}
+              <button type="submit" class="px-3 py-1 rounded-xl bg-yellow-500 text-white">
+                ปิดการแสดงผล
+              </button>
+            </form>
           {% endif %}
+
           <a class="px-3 py-1 rounded-xl ring-1 ring-gray-200"
              href="{% url 'restaurants:admin_edit_restaurant' r.pk %}">แก้ไข</a>
-          <a class="px-3 py-1 rounded-xl ring-1 ring-gray-200"
-             href="{% url 'restaurants:admin_delete_restaurant' r.pk %}">ลบ</a>
+
+          <form method="post" action="{% url 'restaurants:admin_delete_restaurant' r.pk %}">
+            {% csrf_token %}
+            <button type="submit" class="px-3 py-1 rounded-xl ring-1 ring-gray-200">
+              ลบ
+            </button>
+          </form>
         </div>
       </div>
     {% empty %}

@@ -1,0 +1,20 @@
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+  {% for r in restaurants %}
+    <a href="{% url 'restaurants:restaurant_detail' r.pk %}"
+       class="block bg-white rounded-2xl p-4 ring-1 ring-gray-100 shadow-card">
+      <div class="h-40 bg-gray-100 rounded-xl mb-3 overflow-hidden flex items-center justify-center">
+        {% if r.image %}
+          <img src="{{ r.image.url }}" alt="{{ r.name }}" class="w-full h-full object-cover">
+        {% else %}
+          <span class="text-gray-400">ไม่มีรูป</span>
+        {% endif %}
+      </div>
+      <div class="font-semibold">{{ r.name }}</div>
+      <div class="text-sm text-gray-600">{{ r.location|default:"-" }}</div>
+    </a>
+  {% empty %}
+    <div class="col-span-full bg-white rounded-2xl p-6 ring-1 ring-gray-100 text-center">
+      ไม่มีรายการ
+    </div>
+  {% endfor %}
+</div>

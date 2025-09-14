@@ -40,23 +40,15 @@ def add_menu(request):
         if form.is_valid():
             menu = form.save(commit=False)
             menu.created_by = request.user
-            if request.user.is_staff:
-                menu.status = Menu.Status.APPROVED
-                menu.approved_by = request.user
-                menu.approved_at = timezone.now()
-            else:
-                menu.status = Menu.Status.PENDING
+            menu.status = Menu.Status.PENDING   # <-- ใช้ "P"
             menu.save()
-            messages.success(
-                request,
-                'บันทึกเมนูเรียบร้อยแล้ว' if request.user.is_staff
-                else 'ส่งคำขอเพิ่มเมนูเรียบร้อย รอผู้ดูแลอนุมัติ'
-            )
+            messages.success(request, "เพิ่มเมนูสำเร็จ")
             return redirect('menus:menu_list')
-        messages.error(request, 'กรุณาตรวจสอบข้อมูลให้ถูกต้อง')
+        else:
+            messages.error(request, "ข้อมูลไม่ถูกต้อง โปรดตรวจสอบอีกครั้ง")
     else:
         form = MenuForm()
-    return render(request, 'menus/add_menu.html', {'form': form})
+    return render(request, 'menus/add_menu.html', {'form': form})  # ใช้ไฟล์ที่มีจริงของคุณ
 
 
 @login_required
