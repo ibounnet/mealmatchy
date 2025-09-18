@@ -21,27 +21,54 @@
     {% for m in menus %}
       <div class="py-3 flex items-center justify-between">
         <div>
-          <div class="font-semibold">{{ m.name }} {% if m.restaurant %} <span class="text-gray-500">• {{ m.restaurant.name }}</span>{% endif %}</div>
-          <div class="text-sm text-gray-600">โดย: {{ m.created_by.username if m.created_by }}</div>
-          <div class="text-xs mt-1">
-            {% if m.status == 'APPROVED' %}
-              <span class="px-2 py-0.5 rounded bg-green-100 text-green-700">อนุมัติแล้ว</span>
-            {% elif m.status == 'PENDING' %}
-              <span class="px-2 py-0.5 rounded bg-yellow-100 text-yellow-700">รออนุมัติ</span>
+          <div class="font-semibold">
+            {{ m.name }}
+            {% if m.restaurant %}
+              <span class="text-gray-500">• {{ m.restaurant.name }}</span>
+            {% endif %}
+          </div>
+
+          <div class="text-sm text-gray-600">
+            โดย:
+            {% if m.created_by %}
+              {{ m.created_by.username }}
             {% else %}
-              <span class="px-2 py-0.5 rounded bg-red-100 text-red-700">ถูกปฏิเสธ</span>
+              -
+            {% endif %}
+          </div>
+
+          <div class="text-xs mt-1">
+            {% if m.status == Menu.Status.APPROVED %}
+              <span class="px-2 py-0.5 rounded bg-green-100 text-green-700">{{ m.get_status_display }}</span>
+            {% elif m.status == Menu.Status.PENDING %}
+              <span class="px-2 py-0.5 rounded bg-yellow-100 text-yellow-700">{{ m.get_status_display }}</span>
+            {% elif m.status == Menu.Status.REJECTED %}
+              <span class="px-2 py-0.5 rounded bg-red-100 text-red-700">{{ m.get_status_display }}</span>
             {% endif %}
           </div>
         </div>
+
         <div class="flex gap-2">
-          {% if m.status != 'APPROVED' %}
-            <a class="px-3 py-1 rounded-xl bg-green-600 text-white" href="{% url 'menus:approve_menu' m.pk %}">อนุมัติ</a>
+          {% if m.status != Menu.Status.APPROVED %}
+            <form method="post" action="{% url 'menus:approve_menu' m.pk %}">
+              {% csrf_token %}
+              <button type="submit" class="px-3 py-1 rounded-xl bg-green-600 text-white">อนุมัติ</button>
+            </form>
           {% endif %}
-          {% if m.status != 'REJECTED' %}
-            <a class="px-3 py-1 rounded-xl bg-yellow-500 text-white" href="{% url 'menus:reject_menu' m.pk %}">ปฏิเสธ</a>
+
+          {% if m.status != Menu.Status.REJECTED %}
+            <form method="post" action="{% url 'menus:reject_menu' m.pk %}">
+              {% csrf_token %}
+              <button type="submit" class="px-3 py-1 rounded-xl bg-yellow-500 text-white">ปฏิเสธ</button>
+            </form>
           {% endif %}
+
           <a class="px-3 py-1 rounded-xl ring-1 ring-gray-200" href="{% url 'menus:admin_edit_menu' m.pk %}">แก้ไข</a>
-          <a class="px-3 py-1 rounded-xl ring-1 ring-gray-200" href="{% url 'menus:admin_delete_menu' m.pk %}">ลบ</a>
+
+          <form method="post" action="{% url 'menus:admin_delete_menu' m.pk %}">
+            {% csrf_token %}
+            <button type="submit" class="px-3 py-1 rounded-xl ring-1 ring-gray-200">ลบ</button>
+          </form>
         </div>
       </div>
     {% empty %}

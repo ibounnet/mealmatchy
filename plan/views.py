@@ -61,7 +61,6 @@ def plan_start(request):
         request.session.modified = True
         return redirect('plan:diet')
 
-    # (ถ้าเข้าตรงๆ) แสดงฟอร์มข้อจำกัดทันที พร้อมค่าเริ่มต้น
     return redirect('plan:diet')
 
 
@@ -107,13 +106,19 @@ def plan_diet(request):
 def mealplan_summary(request):
     plan = request.session.get('plan')
     if not plan:
-        messages.info(request, "กรุณาเริ่มวางแผนก่อน")
+        # แก้ไม่ให้ messages ซ้ำ
+        storage = messages.get_messages(request)
+        if not any(m.message == "กรุณาเริ่มวางแผนก่อน" for m in storage):
+            messages.info(request, "กรุณาเริ่มวางแผนก่อน")
         return redirect('plan:start')
 
-    budget = _parse_int(plan.get('budget', 50), 50)
+    # ใช้งบที่กรอกมาจริง ๆ ไม่บังคับ 50
+    budget = _parse_int(plan.get('budget', 0), 0)
+
     base_qs = Menu.objects.all().order_by("-created_at")
     base_qs = filter_by_plan(base_qs, plan)
-    base_qs = base_qs.filter(price__lte=budget)
+    if budget > 0:
+        base_qs = base_qs.filter(price__lte=budget)
 
     used: set[int] = set()
     breakfast = _take_distinct(base_qs, 2, used)
@@ -131,3 +136,20 @@ def mealplan_summary(request):
         "sections": sections,
         "today": timezone.localdate(),
     })
+
+
+# ฟังก์ชันแก้ไขงบ (ใช้จากปุ่ม "แก้งบ")
+@login_required
+def update_budget(request):
+    if request.method == "POST":
+        plan = request.session.get('plan')
+        if not plan:
+            messages.error(request, "ไม่พบแผนที่จะปรับงบ")
+            return redirect('plan:start')
+
+        new_budget = _parse_int(request.POST.get("budget", plan.get("budget", 0)), 0)
+        plan['budget'] = new_budget
+        request.session['plan'] = plan
+        request.session.modified = True
+        messages.success(request, "แก้งบประมาณเรียบร้อย")
+        return redirect("plan:summary")
