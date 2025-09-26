@@ -9,12 +9,18 @@
 
     <div>
       <label class="block text-sm font-medium text-gray-700 mb-1">ชื่อสูตร</label>
-      {{ form.title }} {% for e in form.title.errors %}<p class="text-sm text-red-600 mt-1">{{ e }}</p>{% endfor %}
+      {{ form.title }} 
+      {% for e in form.title.errors %}
+        <p class="text-sm text-red-600 mt-1">{{ e }}</p>
+      {% endfor %}
     </div>
 
     <div>
       <label class="block text-sm font-medium text-gray-700 mb-1">แหล่งที่มา/ร้าน (ไม่บังคับ)</label>
-      {{ form.restaurant_name }} {% for e in form.restaurant_name.errors %}<p class="text-sm text-red-600 mt-1">{{ e }}</p>{% endfor %}
+      {{ form.restaurant_name }} 
+      {% for e in form.restaurant_name.errors %}
+        <p class="text-sm text-red-600 mt-1">{{ e }}</p>
+      {% endfor %}
     </div>
 
     <div>
@@ -24,12 +30,18 @@
 
     <div>
       <label class="block text-sm font-medium text-gray-700 mb-1">ส่วนผสม</label>
-      {{ form.ingredients }} {% for e in form.ingredients.errors %}<p class="text-sm text-red-600 mt-1">{{ e }}</p>{% endfor %}
+      {{ form.ingredients }} 
+      {% for e in form.ingredients.errors %}
+        <p class="text-sm text-red-600 mt-1">{{ e }}</p>
+      {% endfor %}
     </div>
 
     <div>
       <label class="block text-sm font-medium text-gray-700 mb-1">วิธีทำ</label>
-      {{ form.steps }} {% for e in form.steps.errors %}<p class="text-sm text-red-600 mt-1">{{ e }}</p>{% endfor %}
+      {{ form.steps }} 
+      {% for e in form.steps.errors %}
+        <p class="text-sm text-red-600 mt-1">{{ e }}</p>
+      {% endfor %}
     </div>
 
     <div class="grid sm:grid-cols-3 gap-4">
@@ -53,8 +65,13 @@
     </div>
 
     <div class="flex items-center gap-3 pt-2">
-      <button class="px-4 py-2 rounded-xl bg-primary text-white hover:bg-primary-dark transition">บันทึกสูตร</button>
-      <a href="{% url 'recipe_list' %}" class="px-4 py-2 rounded-xl ring-1 ring-gray-200 text-gray-700 hover:bg-gray-50">ยกเลิก</a>
+      <button class="px-4 py-2 rounded-xl bg-primary text-white hover:bg-primary-dark transition">
+        บันทึกสูตร
+      </button>
+      <a href="{% url 'recipes:list' %}" 
+         class="px-4 py-2 rounded-xl ring-1 ring-gray-200 text-gray-700 hover:bg-gray-50">
+        ยกเลิก
+      </a>
     </div>
   </form>
 </div>

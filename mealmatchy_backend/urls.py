@@ -16,7 +16,7 @@ urlpatterns = [
     path("budget/", include(("budgets.urls", "budgets"), namespace="budgets")),
     path('', include(('budgets.urls', 'budgets'), namespace='budgets')),
     
-    path('recipes/', include('recipes.urls')),
+    path('recipes/', include(('recipes.urls', 'recipes'), namespace='recipes')),
     path('restaurants/', include(('restaurants.urls', 'restaurants'), namespace='restaurants')),
 
 

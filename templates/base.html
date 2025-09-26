@@ -28,7 +28,8 @@
             <a href="{% url 'home' %}" class="hover:text-primary">หน้าแรก</a>
             <a href="{% url 'menus:menu_list' %}" class="hover:text-primary">เมนูอาหาร</a>
             <a href="{% url 'restaurants:restaurant_list' %}" class="hover:text-primary">ร้านอาหาร</a>
-
+            <a href="{% url 'recipes:list' %}" class="hover:underline">สูตรอาหาร</a> <!-- ✅ เพิ่มตรงนี้ -->
+          
             {% if user.is_staff %}
               <a href="{% url 'restaurants:admin_restaurant_list' %}"
                  class="px-3 py-1.5 rounded-lg ring-1 ring-gray-200 hover:bg-gray-50">

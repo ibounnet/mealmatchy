@@ -1,22 +1,26 @@
-# plan/views.py
 from __future__ import annotations
 from datetime import date
 from typing import Iterable, List, Tuple
+import json
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render
+from django.views.decorators.http import require_POST
 from django.utils import timezone
 
+from budgets.models import BudgetSpend, DailyBudget
 from menus.models import Menu
 from menus.utils import filter_by_plan
 
 
+# ----------------- helpers -----------------
 def _parse_int(v, default: int) -> int:
     try:
         return int(v)
     except Exception:
         return default
+
 
 def _parse_date(s: str | None) -> str:
     if not s:
@@ -27,7 +31,9 @@ def _parse_date(s: str | None) -> str:
     except Exception:
         return timezone.localdate().isoformat()
 
+
 def _take_distinct(qs: Iterable[Menu], n: int, used_ids: set[int]) -> List[Menu]:
+    """เลือกเมนูไม่ซ้ำกันจำนวน n รายการ"""
     picked: List[Menu] = []
     for m in qs:
         if len(picked) >= n:
@@ -39,9 +45,10 @@ def _take_distinct(qs: Iterable[Menu], n: int, used_ids: set[int]) -> List[Menu]
     return picked
 
 
-# เริ่มวางแผนจาก popup (home)
+# ----------------- views -----------------
 @login_required
 def plan_start(request):
+    """เริ่มวางแผนจาก popup (หน้าแรก)"""
     if request.method == 'POST':
         days = _parse_int(request.POST.get('days', '1'), 1)
         budget = _parse_int(request.POST.get('budget', '50'), 50)
@@ -64,9 +71,9 @@ def plan_start(request):
     return redirect('plan:diet')
 
 
-# หน้าเลือกข้อจำกัดอาหาร
 @login_required
 def plan_diet(request):
+    """หน้าเลือกข้อจำกัดอาหาร"""
     plan = request.session.get('plan', {
         'days': 1, 'budget': 50, 'start_date': timezone.localdate().isoformat()
     })
@@ -101,20 +108,20 @@ def plan_diet(request):
     })
 
 
-# หน้าสรุปก่อนเข้า budget/เมนู
 @login_required
 def mealplan_summary(request):
+    """หน้าสรุปก่อนเข้า budget/เมนู"""
     plan = request.session.get('plan')
     if not plan:
-        # แก้ไม่ให้ messages ซ้ำ
+        # ป้องกันไม่ให้ข้อความซ้ำ
         storage = messages.get_messages(request)
         if not any(m.message == "กรุณาเริ่มวางแผนก่อน" for m in storage):
             messages.info(request, "กรุณาเริ่มวางแผนก่อน")
         return redirect('plan:start')
 
-    # ใช้งบที่กรอกมาจริง ๆ ไม่บังคับ 50
     budget = _parse_int(plan.get('budget', 0), 0)
 
+    # query เมนู
     base_qs = Menu.objects.all().order_by("-created_at")
     base_qs = filter_by_plan(base_qs, plan)
     if budget > 0:
@@ -138,9 +145,9 @@ def mealplan_summary(request):
     })
 
 
-# ฟังก์ชันแก้ไขงบ (ใช้จากปุ่ม "แก้งบ")
 @login_required
 def update_budget(request):
+    """ฟังก์ชันแก้ไขงบ (ใช้จากปุ่ม 'แก้งบ')"""
     if request.method == "POST":
         plan = request.session.get('plan')
         if not plan:
@@ -153,3 +160,45 @@ def update_budget(request):
         request.session.modified = True
         messages.success(request, "แก้งบประมาณเรียบร้อย")
         return redirect("plan:summary")
+
+
+@login_required
+@require_POST
+def save_plan(request):
+    """รับข้อมูลจาก summary (menus JSON) แล้วบันทึกเข้า BudgetSpend"""
+    menus_json = request.POST.get("menus", "[]")
+
+    try:
+        menus = json.loads(menus_json)
+    except json.JSONDecodeError:
+        menus = []
+
+    if not menus:
+        messages.error(request, "กรุณาเลือกเมนูก่อนบันทึก")
+        return redirect("plan:summary")
+
+    plan = request.session.get("plan", {})
+    use_date = plan.get("start_date") or date.today().isoformat()
+
+    # ตรวจสอบว่ามี DailyBudget ของวันนั้นแล้วหรือยัง
+    daily, _ = DailyBudget.objects.get_or_create(
+        user=request.user,
+        date=use_date,
+        defaults={"amount": int(plan.get("budget") or 0)}
+    )
+
+    for m in menus:
+        try:
+            menu = Menu.objects.get(pk=m["id"])
+            BudgetSpend.objects.create(
+                user=request.user,
+                date=use_date,
+                amount=menu.price,
+                menu=menu,
+                note=f"เลือกในแผน {menu.name}",
+            )
+        except Menu.DoesNotExist:
+            continue
+
+    messages.success(request, "บันทึกแผนการกินเรียบร้อยแล้ว")
+    return redirect("/budget/?from_plan=1")

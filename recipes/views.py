@@ -5,18 +5,27 @@ from django.db.models import Q
 from .models import Recipe
 from .forms import RecipeForm
 
+
 @login_required
 def recipe_list(request):
-    # ผู้ใช้ทั่วไปเห็นของตัวเอง + ของ staff (แนวเดียวกับเมนู)
+    """
+    แสดงรายการสูตรอาหาร:
+    - staff เห็นทั้งหมด
+    - user เห็นของตนเอง + ที่ staff สร้าง
+    """
     if request.user.is_staff:
         recipes = Recipe.objects.all()
     else:
-        recipes = Recipe.objects.filter(Q(created_by=request.user) | Q(created_by__is_staff=True))
+        recipes = Recipe.objects.filter(
+            Q(created_by=request.user) | Q(created_by__is_staff=True)
+        )
     recipes = recipes.order_by('-created_at')
     return render(request, 'recipes/recipe_list.html', {'recipes': recipes})
 
+
 @login_required
 def add_recipe(request):
+    """เพิ่มสูตรอาหารใหม่"""
     if request.method == 'POST':
         form = RecipeForm(request.POST, request.FILES)
         if form.is_valid():
@@ -24,15 +33,20 @@ def add_recipe(request):
             recipe.created_by = request.user
             recipe.save()
             messages.success(request, 'บันทึกสูตรอาหารเรียบร้อยแล้ว')
-            return redirect('recipe_list')
+            return redirect('recipes:list')
         messages.error(request, 'กรุณาตรวจสอบข้อมูลให้ถูกต้อง')
     else:
         form = RecipeForm()
     return render(request, 'recipes/add_recipe.html', {'form': form})
 
+
 @login_required
 def edit_recipe(request, pk):
-    # เจ้าของแก้ของตนเองได้ / staff แก้ได้ทุกอัน
+    """
+    แก้ไขสูตรอาหาร:
+    - staff แก้ไขได้ทุกอัน
+    - user แก้ไขได้เฉพาะของตนเอง
+    """
     qs = Recipe.objects.all() if request.user.is_staff else Recipe.objects.filter(created_by=request.user)
     recipe = get_object_or_404(qs, pk=pk)
 
@@ -41,19 +55,27 @@ def edit_recipe(request, pk):
         if form.is_valid():
             form.save()
             messages.success(request, 'อัปเดตสูตรอาหารเรียบร้อยแล้ว')
-            return redirect('recipe_list')
+            return redirect('recipes:list')
         messages.error(request, 'แก้ไขไม่สำเร็จ กรุณาตรวจสอบข้อมูล')
     else:
         form = RecipeForm(instance=recipe)
+
     return render(request, 'recipes/edit_recipe.html', {'form': form, 'recipe': recipe})
+
 
 @login_required
 def delete_recipe(request, pk):
+    """
+    ลบสูตรอาหาร:
+    - staff ลบได้ทุกอัน
+    - user ลบได้เฉพาะของตนเอง
+    """
     qs = Recipe.objects.all() if request.user.is_staff else Recipe.objects.filter(created_by=request.user)
     recipe = get_object_or_404(qs, pk=pk)
 
     if request.method == 'POST':
         recipe.delete()
         messages.success(request, 'ลบสูตรอาหารเรียบร้อยแล้ว')
-        return redirect('recipe_list')
+        return redirect('recipes:list')
+
     return render(request, 'recipes/delete_recipe.html', {'recipe': recipe})

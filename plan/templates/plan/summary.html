@@ -2,65 +2,187 @@
 {% block title %}สรุปการวางแผนมื้ออาหาร{% endblock %}
 
 {% block content %}
-{% now "Y-m-d" as today_str %}
-<div class="max-w-5xl mx-auto">
-  <h1 class="text-2xl font-bold text-gray-800 mb-2">สรุปการวางแผนมื้ออาหารของคุณ</h1>
+<div class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
+  <!-- ฝั่งซ้าย: เมนูอาหาร -->
+  <div class="lg:col-span-2">
+    <h1 class="text-2xl font-bold text-gray-800 mb-4">สรุปการวางแผนมื้ออาหารของคุณ</h1>
 
-  <div class="text-sm text-gray-600 mb-6">
-    งบประมาณต่อวัน:
-    <span class="font-semibold text-primary">{{ plan.budget|default:"-" }} บาท</span> |
-    เริ่มวันที่: {{ plan.start_date|default:"-" }} |
-    จำนวนวัน: {{ plan.days|default:"-" }}
-  </div>
+    {% for title, items in sections %}
+      <h2 class="text-xl font-semibold text-gray-800 mt-6 mb-3">{{ title }}</h2>
 
-  {% for title, items in sections %}
-    <h2 class="text-xl font-semibold text-gray-800 mt-6 mb-3">{{ title }} :</h2>
+      {% if items %}
+        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {% for m in items %}
+            <div class="bg-white shadow-sm rounded-2xl overflow-hidden ring-1 ring-gray-200">
+              {% if m.image %}
+                <img src="{{ m.image.url }}" alt="{{ m.name }}" class="w-full h-40 object-cover">
+              {% else %}
+                <div class="w-full h-40 bg-gray-100 flex items-center justify-center text-gray-500">
+                  ไม่มีรูป
+                </div>
+              {% endif %}
+              <div class="p-4 space-y-1">
+                <div class="font-semibold text-gray-900 text-base">{{ m.name }}</div>
+                <div class="text-sm text-gray-700 font-medium">ร้าน: {{ m.restaurant_name|default:"-" }}</div>
+                <div class="flex items-center justify-between pt-2">
+                  <span class="font-bold text-orange-600">{{ m.price }} บาท</span>
 
-    {% if items %}
-      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {% for m in items %}
-          <div class="bg-white shadow-sm rounded-2xl overflow-hidden ring-1 ring-gray-100">
-            {% if m.image %}
-              <img src="{{ m.image.url }}" alt="{{ m.name }}" class="w-full h-40 object-cover">
-            {% else %}
-              <div class="w-full h-40 bg-primary-light/50 flex items-center justify-center text-primary-dark">
-                ไม่มีรูป
-              </div>
-            {% endif %}
-            <div class="p-4 space-y-1">
-              <div class="text-xs text-gray-500">ร้าน: {{ m.restaurant_name|default:"-" }}</div>
-              <div class="font-semibold text-gray-900">{{ m.name }}</div>
-              <div class="text-sm text-gray-600 line-clamp-2">{{ m.description|default:"-" }}</div>
-
-              <div class="flex items-center justify-between pt-2">
-                <span class="font-bold text-primary-dark">{{ m.price }} บาท</span>
-
-                <!-- ปุ่มบันทึกเมนูนี้ลงงบ -->
-                <form method="post" action="{% url 'budgets:consume_menu' m.id %}">
-                  {% csrf_token %}
-                  <input type="hidden" name="date" value="{{ plan.start_date|default:today_str }}">
-                  <button type="submit"
-                          class="px-3 py-1.5 text-sm rounded-lg bg-primary text-white hover:bg-primary-dark">
-                    บันทึกลงงบ
+                  <!-- ปุ่มเลือก -->
+                  <button type="button"
+                          class="select-btn px-3 py-1.5 text-sm rounded-lg bg-orange-500 text-white hover:bg-orange-600"
+                          data-id="{{ m.id }}"
+                          data-name="{{ m.name }}"
+                          data-price="{{ m.price }}"
+                          data-image="{% if m.image %}{{ m.image.url }}{% endif %}"
+                          data-meal="{{ title }}"
+                          data-restaurant="{{ m.restaurant_name|default:"-" }}">
+                    เลือกเมนู
                   </button>
-                </form>
+                </div>
               </div>
             </div>
-          </div>
-        {% endfor %}
-      </div>
-    {% else %}
-      <p class="text-gray-500">ยังไม่มีเมนูที่ตรงเงื่อนไข</p>
-    {% endif %}
-  {% endfor %}
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="text-gray-500">ยังไม่มีเมนูที่ตรงเงื่อนไข</p>
+      {% endif %}
+    {% endfor %}
+  </div>
 
-  <div class="mt-8 flex items-center gap-3">
-    <a href="/budget/" class="px-4 py-2 rounded-xl bg-primary text-white hover:bg-primary-dark">
-      ไปหน้าตารางงบประมาณ
-    </a>
-    <a href="{% url 'home' %}" class="px-4 py-2 rounded-xl ring-1 ring-gray-200 text-gray-700 hover:bg-gray-50">
-      กลับหน้าแรก
-    </a>
+  <!-- ฝั่งขวา: งบประมาณและเมนูที่เลือก -->
+  <div>
+    <div class="bg-white shadow-md rounded-2xl ring-1 ring-gray-200 p-5">
+      <h3 class="text-lg font-bold text-gray-800 mb-3">สรุปงบประมาณ</h3>
+      <p class="text-sm text-gray-700 mb-1">งบต่อวัน:
+        <span class="font-bold text-red-600">{{ plan.budget }} บาท</span>
+      </p>
+      <p class="text-sm text-gray-700 mb-3">งบที่เหลือ:
+        <span id="remain-budget" class="font-bold text-red-600">{{ plan.budget }}</span> บาท
+      </p>
+
+      <div id="selected-list" class="space-y-4">
+        <p class="text-gray-400">ยังไม่ได้เลือกเมนู</p>
+      </div>
+
+      <form method="post" action="{% url 'plan:save_plan' %}" class="mt-4">
+        {% csrf_token %}
+        <input type="hidden" name="menus" id="menus-input">
+        <p id="error-msg" class="text-red-600 text-sm hidden mb-2"></p>
+        <button type="submit"
+                id="save-btn"
+                class="w-full px-4 py-2 rounded-lg bg-orange-500 text-white font-semibold hover:bg-orange-600 disabled:opacity-50">
+          บันทึกแผน
+        </button>
+      </form>
+    </div>
   </div>
 </div>
+
+<!-- Script -->
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const buttons = document.querySelectorAll(".select-btn");
+  const listEl = document.getElementById("selected-list");
+  const remainEl = document.getElementById("remain-budget");
+  const menusInput = document.getElementById("menus-input");
+  const saveBtn = document.getElementById("save-btn");
+  const errorMsg = document.getElementById("error-msg");
+  const budget = parseInt("{{ plan.budget }}");
+  let selectedMenus = [];
+
+  function render() {
+    listEl.innerHTML = "";
+    let remain = budget;
+
+    if (selectedMenus.length === 0) {
+      listEl.innerHTML = "<p class='text-gray-400'>ยังไม่ได้เลือกเมนู</p>";
+    } else {
+      const grouped = {};
+      selectedMenus.forEach(m => {
+        if (!grouped[m.meal]) grouped[m.meal] = [];
+        grouped[m.meal].push(m);
+      });
+
+      Object.keys(grouped).forEach(meal => {
+        const mealTitle = document.createElement("h4");
+        mealTitle.className = "font-bold text-lg mt-3 mb-2 text-gray-800";
+        mealTitle.textContent = meal;
+        listEl.appendChild(mealTitle);
+
+        const grid = document.createElement("div");
+        grid.className = "grid grid-cols-1 gap-4";
+
+        grouped[meal].forEach(m => {
+          remain -= m.price;
+          const card = document.createElement("div");
+          card.className = "bg-white shadow-sm rounded-xl overflow-hidden ring-1 ring-gray-200";
+
+          if (m.image) {
+            const img = document.createElement("img");
+            img.src = m.image;
+            img.className = "w-full h-32 object-cover";
+            card.appendChild(img);
+          }
+
+          const body = document.createElement("div");
+          body.className = "p-3";
+          body.innerHTML = `
+            <div class="font-bold text-gray-900 text-base">${m.name}</div>
+            <div class="text-sm text-gray-700 font-medium">ร้าน: ${m.restaurant || "-"}</div>
+            <div class="text-sm text-orange-600 font-semibold">${m.price} บาท</div>
+          `;
+          card.appendChild(body);
+
+          grid.appendChild(card);
+        });
+
+        listEl.appendChild(grid);
+      });
+    }
+
+    remainEl.textContent = remain;
+    menusInput.value = JSON.stringify(selectedMenus);
+
+    if (remain < 0) {
+      saveBtn.disabled = true;
+      errorMsg.textContent = `คุณใช้เกินงบ ${Math.abs(remain)} บาท`;
+      errorMsg.classList.remove("hidden");
+    } else {
+      saveBtn.disabled = false;
+      errorMsg.classList.add("hidden");
+    }
+  }
+
+  buttons.forEach(btn => {
+    btn.addEventListener("click", () => {
+      const menu = {
+        id: btn.dataset.id,
+        name: btn.dataset.name,
+        price: parseInt(btn.dataset.price),
+        image: btn.dataset.image,
+        meal: btn.dataset.meal,
+        restaurant: btn.dataset.restaurant,
+      };
+
+      // toggle
+      const idx = selectedMenus.findIndex(m => m.id == menu.id && m.meal == menu.meal);
+      if (idx >= 0) {
+        selectedMenus.splice(idx, 1);
+        btn.textContent = "เลือกเมนู";
+        btn.classList.remove("bg-green-600");
+        btn.classList.add("bg-orange-500");
+      } else {
+        selectedMenus.push(menu);
+        btn.textContent = "✓ เลือกแล้ว";
+        btn.classList.remove("bg-orange-500");
+        btn.classList.add("bg-green-600");
+      }
+
+      render();
+    });
+  });
+
+  render();
+});
+</script>
 {% endblock %}
