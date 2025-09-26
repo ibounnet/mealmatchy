@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}ตั้ง/แก้งบรายวัน{% endblock %}
+{% block content %}
+<div class="max-w-md mx-auto bg-white rounded-2xl ring-1 ring-gray-100 p-6">
+  <h1 class="text-xl font-bold mb-4">ตั้ง/แก้งบรายวัน</h1>
+  <form method="post">
+    {% csrf_token %}
+    <div class="space-y-3">
+      <div>
+        <label class="text-sm text-gray-600">วันที่</label>
+        {{ form.date }}
+      </div>
+      <div>
+        <label class="text-sm text-gray-600">งบ (บาท)</label>
+        {{ form.amount }}
+      </div>
+    </div>
+    <div class="mt-5 flex gap-2">
+      <a href="/budget/" class="px-4 py-2 rounded-lg ring-1 ring-gray-200 hover:bg-gray-50">ยกเลิก</a>
+      <button class="px-4 py-2 rounded-lg bg-primary text-white hover:bg-primary-dark">บันทึก</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+{% block title %}เพิ่มเมนูให้ {{ restaurant.name }}{% endblock %}
+{% block content %}
+<div class="max-w-2xl mx-auto">
+  <h1 class="text-2xl font-bold mb-6">เพิ่มเมนูให้ "{{ restaurant.name }}"</h1>
+  <form method="post" enctype="multipart/form-data" class="bg-white p-6 rounded-2xl ring-1 ring-gray-100 space-y-4">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    <div>
+      <label class="block mb-1">ชื่อเมนู</label>
+      {{ form.name }}
+      {% for e in form.name.errors %}<p class="text-red-600 text-sm">{{ e }}</p>{% endfor %}
+    </div>
+    <div>
+      <label class="block mb-1">รายละเอียด</label>
+      {{ form.description }}
+    </div>
+    <div>
+      <label class="block mb-1">ราคา</label>
+      {{ form.price }}
+    </div>
+    <div>
+      <label class="block mb-1">รูปภาพ</label>
+      {{ form.image }}
+    </div>
+    <div class="flex gap-2">
+      <button class="px-4 py-2 rounded-xl bg-primary text-white">บันทึก</button>
+      <a href="{% url 'restaurants:restaurant_detail' restaurant.pk %}" class="px-4 py-2 rounded-xl ring-1 ring-gray-200">ยกเลิก</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

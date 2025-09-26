@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <title>{% block title %}MealMatchy{% endblock %}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: { primary: { DEFAULT:'#f97316', dark:'#ea580c', light:'#fff7ed' } },
+          borderRadius: { xl: '0.75rem' },
+          boxShadow: { card:'0 8px 24px rgba(0,0,0,.06)' }
+        }
+      }
+    };
+  </script>
+</head>
+<body class="bg-gray-50 text-gray-900">
+  <nav class="bg-white border-b border-gray-100">
+    <div class="max-w-6xl mx-auto px-4">
+      <div class="h-14 flex items-center justify-between">
+        <a href="{% url 'home' %}" class="font-bold text-primary">MealMatchy</a>
+
+        <div class="flex items-center gap-5 text-sm">
+          {% if user.is_authenticated %}
+            <a href="{% url 'home' %}" class="hover:text-primary">หน้าแรก</a>
+            <a href="{% url 'menus:menu_list' %}" class="hover:text-primary">เมนูอาหาร</a>
+            <a href="{% url 'restaurants:restaurant_list' %}" class="hover:text-primary">ร้านอาหาร</a>
+
+            {% if user.is_staff %}
+              <a href="{% url 'restaurants:admin_restaurant_list' %}"
+                 class="px-3 py-1.5 rounded-lg ring-1 ring-gray-200 hover:bg-gray-50">
+                จัดการร้านอาหาร
+              </a>
+              <a href="{% url 'menus:admin_menu_list' %}"
+                 class="px-3 py-1.5 rounded-lg ring-1 ring-gray-200 hover:bg-gray-50">
+                จัดการเมนูอาหาร
+              </a>
+            {% endif %}
+
+            <a href="{% url 'profile' %}" class="hover:text-primary">โปรไฟล์</a>
+            <a href="{% url 'logout' %}" class="px-3 py-1.5 rounded-lg bg-primary text-white hover:bg-primary-dark">
+              ออกจากระบบ
+            </a>
+          {% else %}
+            <a href="{% url 'login' %}" class="hover:text-primary">เข้าสู่ระบบ</a>
+            <a href="{% url 'register' %}" class="px-3 py-1.5 rounded-lg bg-primary text-white hover:bg-primary-dark">
+              สมัครสมาชิก
+            </a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <main class="max-w-6xl mx-auto px-4 py-6">
+    {% if messages %}
+      <div class="space-y-2 mb-4">
+        {% for message in messages %}
+          <div class="px-4 py-3 rounded-xl
+            {% if message.tags == 'success' %} bg-green-50 text-green-700
+            {% elif message.tags == 'error' %} bg-red-50 text-red-700
+            {% else %} bg-gray-100 text-gray-700 {% endif %}">
+            {{ message }}
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

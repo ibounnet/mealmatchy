@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+{% block title %}จัดการร้านอาหาร (แอดมิน) | MealMatchy{% endblock %}
+{% block content %}
+<div class="max-w-6xl mx-auto">
+  <div class="flex items-center justify-between mb-4">
+    <h1 class="text-2xl font-bold">จัดการร้านอาหาร</h1>
+    <a class="px-4 py-2 rounded-xl bg-primary text-white" href="{% url 'restaurants:admin_add_restaurant' %}">
+      + เพิ่มร้าน
+    </a>
+  </div>
+
+  <div class="flex gap-2 mb-4">
+    <a class="px-3 py-2 rounded-xl ring-1 ring-gray-200 {% if not status %}bg-gray-100{% endif %}"
+       href="{% url 'restaurants:admin_restaurant_list' %}">ทั้งหมด</a>
+    <a class="px-3 py-2 rounded-xl ring-1 ring-gray-200 {% if status == 'active' %}bg-gray-100{% endif %}"
+       href="{% url 'restaurants:admin_restaurant_list' %}?status=active">อนุมัติแล้ว</a>
+    <a class="px-3 py-2 rounded-xl ring-1 ring-gray-200 {% if status == 'pending' %}bg-gray-100{% endif %}"
+       href="{% url 'restaurants:admin_restaurant_list' %}?status=pending">รออนุมัติ</a>
+  </div>
+
+  <div class="divide-y">
+    {% for r in restaurants %}
+      <div class="py-3 flex items-center justify-between">
+        <div class="min-w-0">
+          <div class="font-semibold truncate">{{ r.name }}</div>
+          <div class="text-sm text-gray-600 truncate">{{ r.location|default:"-" }}</div>
+          <div class="text-xs {% if r.is_active %}text-green-600{% else %}text-orange-600{% endif %}">
+            {% if r.is_active %}อนุมัติแล้ว{% else %}รออนุมัติ{% endif %}
+            {% if r.created_by %} • ผู้ขอ: {{ r.created_by.username }}{% endif %}
+          </div>
+        </div>
+        <div class="flex gap-2 items-center">
+          {% if not r.is_active %}
+            <form method="post" action="{% url 'restaurants:admin_approve_restaurant' r.pk %}">
+              {% csrf_token %}
+              <button type="submit" class="px-3 py-1 rounded-xl bg-green-600 text-white">
+                อนุมัติ
+              </button>
+            </form>
+          {% else %}
+            <form method="post" action="{% url 'restaurants:admin_reject_restaurant' r.pk %}">
+              {% csrf_token %}
+              <button type="submit" class="px-3 py-1 rounded-xl bg-yellow-500 text-white">
+                ปิดการแสดงผล
+              </button>
+            </form>
+          {% endif %}
+
+          <a class="px-3 py-1 rounded-xl ring-1 ring-gray-200"
+             href="{% url 'restaurants:admin_edit_restaurant' r.pk %}">แก้ไข</a>
+
+          <form method="post" action="{% url 'restaurants:admin_delete_restaurant' r.pk %}">
+            {% csrf_token %}
+            <button type="submit" class="px-3 py-1 rounded-xl ring-1 ring-gray-200">
+              ลบ
+            </button>
+          </form>
+        </div>
+      </div>
+    {% empty %}
+      <div class="bg-white rounded-2xl p-6 ring-1 ring-gray-100 text-center">ไม่มีรายการ</div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

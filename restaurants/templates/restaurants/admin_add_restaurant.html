@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+{% block title %}เพิ่มร้านอาหาร (แอดมิน){% endblock %}
+{% block content %}
+<div class="max-w-2xl mx-auto">
+  <h1 class="text-2xl font-bold mb-6">เพิ่มร้านอาหาร (แอดมิน)</h1>
+  <form method="post" enctype="multipart/form-data" class="bg-white p-6 rounded-2xl ring-1 ring-gray-100 space-y-4">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <div class="flex gap-2">
+      <button class="px-4 py-2 rounded-xl bg-primary text-white">บันทึก</button>
+      <a href="{% url 'restaurants:admin_restaurant_list' %}" class="px-4 py-2 rounded-xl ring-1 ring-gray-200">ยกเลิก</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

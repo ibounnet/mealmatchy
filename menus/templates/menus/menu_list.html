@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+{% block title %}เมนูของฉัน{% endblock %}
+{% block content %}
+<div class="max-w-5xl mx-auto">
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold text-gray-800">เมนูอาหาร</h1>
+    <a href="{% url 'menus:add_menu' %}"
+       class="inline-flex items-center px-4 py-2 rounded-xl bg-primary text-white hover:bg-primary-dark transition">
+      + เพิ่มเมนู
+    </a>
+  </div>
+
+  {% if menus %}
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      {% for m in menus %}
+        <div class="bg-white shadow-sm rounded-2xl overflow-hidden ring-1 ring-gray-100">
+          {% if m.image %}
+            <img src="{{ m.image.url }}" alt="{{ m.name }}" class="w-full h-40 object-cover">
+          {% else %}
+            <div class="w-full h-40 bg-primary-light/50 flex items-center justify-center text-primary-dark">ไม่มีรูป</div>
+          {% endif %}
+          <div class="p-4 space-y-2">
+            <div class="text-xs text-gray-500">ร้าน: {{ m.restaurant_name|default:"-" }}</div>
+            <h3 class="font-semibold text-gray-900">{{ m.name }}</h3>
+            <p class="text-sm text-gray-600 line-clamp-2">{{ m.description|default:"-" }}</p>
+
+            <div class="flex items-center justify-between pt-2">
+              <span class="font-bold text-primary-dark">{{ m.price }} บาท</span>
+
+              {# เงื่อนไขโชว์ปุ่ม (ตัวอย่าง: เจ้าของเมนูหรือแอดมิน) #}
+              {% if user.is_staff or m.created_by_id == user.id %}
+              <div class="flex gap-2">
+                <a href="{% url 'menus:edit_menu' m.pk %}"
+                   class="px-3 py-1.5 text-sm rounded-lg bg-white ring-1 ring-primary text-primary hover:bg-primary-light/40">แก้ไข</a>
+                <a href="{% url 'menus:delete_menu' m.pk %}"
+                   class="px-3 py-1.5 text-sm rounded-lg bg-white ring-1 ring-red-300 text-red-600 hover:bg-red-50">ลบ</a>
+              </div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="bg-white rounded-2xl p-8 text-center ring-1 ring-gray-100">
+      <p class="text-gray-600">ยังไม่มีเมนู ลองเพิ่มเมนูแรกของคุณ</p>
+      <a href="{% url 'menus:add_menu' %}"
+         class="mt-4 inline-flex items-center px-4 py-2 rounded-xl bg-primary text-white hover:bg-primary-dark transition">
+        + เพิ่มเมนู
+      </a>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}ตารางงบรายสัปดาห์{% endblock %}
+{% block content %}
+<div class="max-w-6xl mx-auto">
+
+  {% if messages %}
+    <div class="space-y-2 mb-4">
+      {% for message in messages %}
+        <div class="px-4 py-3 rounded-xl {% if message.tags == 'success' %}bg-green-50 text-green-700{% elif message.tags == 'error' %}bg-red-50 text-red-700{% else %}bg-gray-100 text-gray-700{% endif %}">
+          {{ message }}
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <!-- ส่วนหัว -->
+  <div class="flex items-center justify-between mb-3">
+    <h1 class="text-2xl font-bold">ตารางงบรายสัปดาห์</h1>
+    <div class="flex gap-2">
+      <a href="/menus/"
+         class="px-3 py-2 rounded-xl bg-primary text-white hover:bg-primary-dark">
+        ไปหน้าเมนูทั้งหมด
+      </a>
+    </div>
+  </div>
+
+  <!-- ช่วงวันที่ -->
+  <div class="flex items-center gap-2 mb-3 text-sm">
+    {% if not restrict %}
+      <a class="px-3 py-1.5 rounded-lg ring-1 ring-gray-200 hover:bg-gray-50"
+         href="{% url 'budgets:home' %}?start={{ prev_start|date:'Y-m-d' }}">« สัปดาห์ก่อน</a>
+    {% endif %}
+    <div class="px-3 py-1.5">
+      {{ start_date|date:"Y-m-d" }} – {{ end_date|date:"Y-m-d" }}
+    </div>
+    {% if not restrict %}
+      <a class="px-3 py-1.5 rounded-lg ring-1 ring-gray-200 hover:bg-gray-50"
+         href="{% url 'budgets:home' %}?start={{ next_start|date:'Y-m-d' }}">สัปดาห์ถัดไป »</a>
+    {% endif %}
+  </div>
+
+  <!-- ตารางงบ -->
+  <div class="overflow-x-auto bg-white rounded-2xl ring-1 ring-gray-100">
+    <table class="min-w-full text-sm">
+      <thead class="bg-orange-50">
+        <tr class="text-left">
+          <th class="px-4 py-3">วันที่</th>
+          <th class="px-4 py-3">งบ (฿)</th>
+          <th class="px-4 py-3">ใช้ไป (฿)</th>
+          <th class="px-4 py-3">คงเหลือ (฿)</th>
+          <th class="px-4 py-3">รายการเมนู/ใช้จ่าย</th>
+          <th class="px-4 py-3">จัดการ</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+          <tr class="border-t align-top {% if row.is_today %}bg-yellow-50{% endif %}">
+            <td class="px-4 py-3">
+              <div class="font-medium">{{ row.date|date:"Y-m-d" }}</div>
+              <a class="text-primary hover:underline text-xs"
+                 href="{% url 'budgets:day_detail' row.date|date:'Y-m-d' %}">
+                ดูรายละเอียด
+              </a>
+            </td>
+            <td class="px-4 py-3">{{ row.budget_amount }}</td>
+            <td class="px-4 py-3">{{ row.spent_amount }}</td>
+            <td class="px-4 py-3">
+              {% if row.remain_amount < 0 %}
+                <span class="text-red-600 font-semibold">{{ row.remain_amount }}</span>
+              {% else %}
+                {{ row.remain_amount }}
+              {% endif %}
+            </td>
+            <td class="px-4 py-3">
+              <ul class="list-disc list-inside space-y-1">
+                {% for s in row.spends %}
+                  <li>
+                    {% if s.menu %}
+                      <span class="font-medium">{{ s.menu.name }}</span>
+                    {% else %}
+                      รายการ
+                    {% endif %}
+                    <span class="text-gray-500">— {{ s.amount }} ฿</span>
+                  </li>
+                {% empty %}
+                  <li class="text-gray-400">-</li>
+                {% endfor %}
+              </ul>
+              {% if row.advice %}
+                <div class="text-xs text-gray-500 mt-1">{{ row.advice }}</div>
+              {% endif %}
+            </td>
+            <td class="px-4 py-3">
+              <a href="{% url 'budgets:set_daily_with_date' row.date|date:'Y-m-d' %}"
+                 class="px-3 py-1.5 rounded-lg ring-1 ring-gray-200 hover:bg-gray-50">
+                แก้งบ
+              </a>
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="6" class="px-4 py-6 text-center text-gray-500">
+              ยังไม่มีรายการในช่วงนี้
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ปุ่มกลับไปแผนเมนู -->
+  {% if plan_mode %}
+    <div class="mt-6">
+      <a href="{% url 'plan:summary' %}"
+         class="px-4 py-2 rounded-xl ring-1 ring-gray-200 hover:bg-gray-50">
+        ← กลับไปแผนเมนู
+      </a>
+    </div>
+  {% endif %}
+
+</div>
+{% endblock %}
