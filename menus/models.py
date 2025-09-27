@@ -1,12 +1,21 @@
-# menus/models.py
 from django.db import models
 from django.contrib.auth.models import User
 from restaurants.models import Restaurant
 import os, uuid
 
+
 def menu_image_path(instance, filename):
     base, ext = os.path.splitext(filename)
     return os.path.join('menu_images', f"{uuid.uuid4()}{ext}")
+
+
+class Ingredient(models.Model):
+    """เก็บวัตถุดิบ เช่น กุ้ง, หมู, ไข่, นม"""
+    name = models.CharField(max_length=100, unique=True)
+
+    def __str__(self):
+        return self.name
+
 
 class Menu(models.Model):
     restaurant = models.ForeignKey(
@@ -21,7 +30,10 @@ class Menu(models.Model):
 
     image = models.ImageField(upload_to=menu_image_path, blank=True, null=True)
 
-    ingredients = models.TextField(blank=True, default="")
+    # ใช้ ManyToMany แทน TextField
+    ingredients = models.ManyToManyField("Ingredient", blank=True, related_name="menus")
+
+    # flags สำหรับศาสนา / ไลฟ์สไตล์
     is_halal = models.BooleanField(default=False)
     is_vegetarian = models.BooleanField(default=False)
     is_vegan = models.BooleanField(default=False)
@@ -45,4 +57,4 @@ class Menu(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return self.name
+        return f"{self.name} ({self.restaurant_name or self.restaurant})"
