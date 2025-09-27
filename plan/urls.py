@@ -9,5 +9,6 @@ urlpatterns = [
     path("summary/", views.mealplan_summary, name="summary"),
     path("save/", views.save_plan, name="save_plan"),
 
+    
 ]
 

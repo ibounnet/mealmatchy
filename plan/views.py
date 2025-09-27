@@ -1,7 +1,7 @@
 from __future__ import annotations
 from datetime import date
 from typing import Iterable, List, Tuple
-import json
+import json, random
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -10,7 +10,7 @@ from django.views.decorators.http import require_POST
 from django.utils import timezone
 
 from budgets.models import BudgetSpend, DailyBudget
-from menus.models import Menu
+from menus.models import Menu, Restaurant   # ✅ import Restaurant
 from menus.utils import filter_by_plan
 
 
@@ -32,19 +32,6 @@ def _parse_date(s: str | None) -> str:
         return timezone.localdate().isoformat()
 
 
-def _take_distinct(qs: Iterable[Menu], n: int, used_ids: set[int]) -> List[Menu]:
-    """เลือกเมนูไม่ซ้ำกันจำนวน n รายการ"""
-    picked: List[Menu] = []
-    for m in qs:
-        if len(picked) >= n:
-            break
-        if m.id in used_ids:
-            continue
-        picked.append(m)
-        used_ids.add(m.id)
-    return picked
-
-
 # ----------------- views -----------------
 @login_required
 def plan_start(request):
@@ -54,7 +41,6 @@ def plan_start(request):
         budget = _parse_int(request.POST.get('budget', '50'), 50)
         start_date = _parse_date(request.POST.get('start_date', ''))
 
-        # เก็บ/ผสมข้อมูลเก่าใน session
         old = request.session.get('plan', {})
         request.session['plan'] = {
             'days': days,
@@ -110,10 +96,9 @@ def plan_diet(request):
 
 @login_required
 def mealplan_summary(request):
-    """หน้าสรุปก่อนเข้า budget/เมนู"""
+    """หน้าสรุปแผน: สุ่มร้าน -> ดึงเมนูของร้าน"""
     plan = request.session.get('plan')
     if not plan:
-        # ป้องกันไม่ให้ข้อความซ้ำ
         storage = messages.get_messages(request)
         if not any(m.message == "กรุณาเริ่มวางแผนก่อน" for m in storage):
             messages.info(request, "กรุณาเริ่มวางแผนก่อน")
@@ -121,53 +106,31 @@ def mealplan_summary(request):
 
     budget = _parse_int(plan.get('budget', 0), 0)
 
-    # query เมนู
-    base_qs = Menu.objects.all().order_by("-created_at")
-    base_qs = filter_by_plan(base_qs, plan)
-    if budget > 0:
-        base_qs = base_qs.filter(price__lte=budget)
+    # ✅ เลือกร้านแบบสุ่ม 3 ร้าน
+    restaurant_ids = list(Restaurant.objects.values_list("id", flat=True))
+    picked_ids = random.sample(restaurant_ids, min(3, len(restaurant_ids)))
+    restaurants = Restaurant.objects.filter(id__in=picked_ids)
 
-    used: set[int] = set()
-    breakfast = _take_distinct(base_qs, 2, used)
-    lunch     = _take_distinct(base_qs, 2, used)
-    dinner    = _take_distinct(base_qs, 2, used)
-
-    sections: List[Tuple[str, List[Menu]]] = [
-        ("มื้อเช้า", breakfast),
-        ("มื้อเที่ยง", lunch),
-        ("มื้อเย็น", dinner),
-    ]
+    data = []
+    for r in restaurants:
+        menus = Menu.objects.filter(restaurant=r)
+        menus = filter_by_plan(menus, plan)
+        if budget > 0:
+            menus = menus.filter(price__lte=budget)
+        data.append((r, menus))
 
     return render(request, "plan/summary.html", {
         "plan": plan,
-        "sections": sections,
+        "restaurant_menus": data,
         "today": timezone.localdate(),
     })
 
 
 @login_required
-def update_budget(request):
-    """ฟังก์ชันแก้ไขงบ (ใช้จากปุ่ม 'แก้งบ')"""
-    if request.method == "POST":
-        plan = request.session.get('plan')
-        if not plan:
-            messages.error(request, "ไม่พบแผนที่จะปรับงบ")
-            return redirect('plan:start')
-
-        new_budget = _parse_int(request.POST.get("budget", plan.get("budget", 0)), 0)
-        plan['budget'] = new_budget
-        request.session['plan'] = plan
-        request.session.modified = True
-        messages.success(request, "แก้งบประมาณเรียบร้อย")
-        return redirect("plan:summary")
-
-
-@login_required
 @require_POST
 def save_plan(request):
-    """รับข้อมูลจาก summary (menus JSON) แล้วบันทึกเข้า BudgetSpend"""
+    """บันทึกแผนเข้าฐานข้อมูล"""
     menus_json = request.POST.get("menus", "[]")
-
     try:
         menus = json.loads(menus_json)
     except json.JSONDecodeError:
@@ -180,7 +143,6 @@ def save_plan(request):
     plan = request.session.get("plan", {})
     use_date = plan.get("start_date") or date.today().isoformat()
 
-    # ตรวจสอบว่ามี DailyBudget ของวันนั้นแล้วหรือยัง
     daily, _ = DailyBudget.objects.get_or_create(
         user=request.user,
         date=use_date,

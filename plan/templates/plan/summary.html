@@ -3,16 +3,15 @@
 
 {% block content %}
 <div class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
-  <!-- ฝั่งซ้าย: เมนูอาหาร -->
+  <!-- ฝั่งซ้าย: เมนูจากร้าน -->
   <div class="lg:col-span-2">
-    <h1 class="text-2xl font-bold text-gray-800 mb-4">สรุปการวางแผนมื้ออาหารของคุณ</h1>
+    <h1 class="text-2xl font-bold text-gray-800 mb-4">เลือกเมนูจากร้านอาหาร</h1>
 
-    {% for title, items in sections %}
-      <h2 class="text-xl font-semibold text-gray-800 mt-6 mb-3">{{ title }}</h2>
-
-      {% if items %}
+    {% for r, menus in restaurant_menus %}
+      <h2 class="text-lg font-semibold text-gray-900 mt-6 mb-2">ร้าน {{ r.name }}</h2>
+      {% if menus %}
         <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {% for m in items %}
+          {% for m in menus %}
             <div class="bg-white shadow-sm rounded-2xl overflow-hidden ring-1 ring-gray-200">
               {% if m.image %}
                 <img src="{{ m.image.url }}" alt="{{ m.name }}" class="w-full h-40 object-cover">
@@ -23,33 +22,27 @@
               {% endif %}
               <div class="p-4 space-y-1">
                 <div class="font-semibold text-gray-900 text-base">{{ m.name }}</div>
-                <div class="text-sm text-gray-700 font-medium">ร้าน: {{ m.restaurant_name|default:"-" }}</div>
-                <div class="flex items-center justify-between pt-2">
-                  <span class="font-bold text-orange-600">{{ m.price }} บาท</span>
-
-                  <!-- ปุ่มเลือก -->
-                  <button type="button"
-                          class="select-btn px-3 py-1.5 text-sm rounded-lg bg-orange-500 text-white hover:bg-orange-600"
-                          data-id="{{ m.id }}"
-                          data-name="{{ m.name }}"
-                          data-price="{{ m.price }}"
-                          data-image="{% if m.image %}{{ m.image.url }}{% endif %}"
-                          data-meal="{{ title }}"
-                          data-restaurant="{{ m.restaurant_name|default:"-" }}">
-                    เลือกเมนู
-                  </button>
-                </div>
+                <div class="text-sm text-gray-700 font-medium">ราคา: {{ m.price }} บาท</div>
+                <button type="button"
+                        class="select-btn px-3 py-1.5 text-sm rounded-lg bg-orange-500 text-white hover:bg-orange-600"
+                        data-id="{{ m.id }}"
+                        data-name="{{ m.name }}"
+                        data-price="{{ m.price }}"
+                        data-image="{% if m.image %}{{ m.image.url }}{% endif %}"
+                        data-restaurant="{{ r.name }}">
+                  เลือกเมนู
+                </button>
               </div>
             </div>
           {% endfor %}
         </div>
       {% else %}
-        <p class="text-gray-500">ยังไม่มีเมนูที่ตรงเงื่อนไข</p>
+        <p class="text-gray-500">ร้านนี้ยังไม่มีเมนู</p>
       {% endif %}
     {% endfor %}
   </div>
 
-  <!-- ฝั่งขวา: งบประมาณและเมนูที่เลือก -->
+  <!-- ฝั่งขวา: สรุปงบประมาณ -->
   <div>
     <div class="bg-white shadow-md rounded-2xl ring-1 ring-gray-200 p-5">
       <h3 class="text-lg font-bold text-gray-800 mb-3">สรุปงบประมาณ</h3>
@@ -97,46 +90,25 @@ document.addEventListener("DOMContentLoaded", () => {
     if (selectedMenus.length === 0) {
       listEl.innerHTML = "<p class='text-gray-400'>ยังไม่ได้เลือกเมนู</p>";
     } else {
-      const grouped = {};
       selectedMenus.forEach(m => {
-        if (!grouped[m.meal]) grouped[m.meal] = [];
-        grouped[m.meal].push(m);
-      });
-
-      Object.keys(grouped).forEach(meal => {
-        const mealTitle = document.createElement("h4");
-        mealTitle.className = "font-bold text-lg mt-3 mb-2 text-gray-800";
-        mealTitle.textContent = meal;
-        listEl.appendChild(mealTitle);
-
-        const grid = document.createElement("div");
-        grid.className = "grid grid-cols-1 gap-4";
-
-        grouped[meal].forEach(m => {
-          remain -= m.price;
-          const card = document.createElement("div");
-          card.className = "bg-white shadow-sm rounded-xl overflow-hidden ring-1 ring-gray-200";
-
-          if (m.image) {
-            const img = document.createElement("img");
-            img.src = m.image;
-            img.className = "w-full h-32 object-cover";
-            card.appendChild(img);
-          }
-
-          const body = document.createElement("div");
-          body.className = "p-3";
-          body.innerHTML = `
-            <div class="font-bold text-gray-900 text-base">${m.name}</div>
-            <div class="text-sm text-gray-700 font-medium">ร้าน: ${m.restaurant || "-"}</div>
-            <div class="text-sm text-orange-600 font-semibold">${m.price} บาท</div>
-          `;
-          card.appendChild(body);
-
-          grid.appendChild(card);
-        });
-
-        listEl.appendChild(grid);
+        remain -= m.price;
+        const card = document.createElement("div");
+        card.className = "bg-white shadow-sm rounded-xl overflow-hidden ring-1 ring-gray-200";
+        if (m.image) {
+          const img = document.createElement("img");
+          img.src = m.image;
+          img.className = "w-full h-24 object-cover";
+          card.appendChild(img);
+        }
+        const body = document.createElement("div");
+        body.className = "p-3";
+        body.innerHTML = `
+          <div class="font-bold text-gray-900 text-base">${m.name}</div>
+          <div class="text-sm text-gray-700">ร้าน: ${m.restaurant}</div>
+          <div class="text-sm text-orange-600 font-semibold">${m.price} บาท</div>
+        `;
+        card.appendChild(body);
+        listEl.appendChild(card);
       });
     }
 
@@ -160,12 +132,10 @@ document.addEventListener("DOMContentLoaded", () => {
         name: btn.dataset.name,
         price: parseInt(btn.dataset.price),
         image: btn.dataset.image,
-        meal: btn.dataset.meal,
         restaurant: btn.dataset.restaurant,
       };
 
-      // toggle
-      const idx = selectedMenus.findIndex(m => m.id == menu.id && m.meal == menu.meal);
+      const idx = selectedMenus.findIndex(m => m.id == menu.id);
       if (idx >= 0) {
         selectedMenus.splice(idx, 1);
         btn.textContent = "เลือกเมนู";
@@ -180,6 +150,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
       render();
     });
+  });
+
+  // อัปเดต hidden input ก่อน submit
+  const form = document.querySelector("form");
+  form.addEventListener("submit", () => {
+    menusInput.value = JSON.stringify(selectedMenus);
   });
 
   render();

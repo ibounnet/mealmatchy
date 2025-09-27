@@ -3,10 +3,14 @@
 {% block content %}
 <div class="max-w-6xl mx-auto">
 
+  <!-- แสดงข้อความแจ้งเตือน -->
   {% if messages %}
     <div class="space-y-2 mb-4">
       {% for message in messages %}
-        <div class="px-4 py-3 rounded-xl {% if message.tags == 'success' %}bg-green-50 text-green-700{% elif message.tags == 'error' %}bg-red-50 text-red-700{% else %}bg-gray-100 text-gray-700{% endif %}">
+        <div class="px-4 py-3 rounded-xl 
+          {% if message.tags == 'success' %}bg-green-50 text-green-700
+          {% elif message.tags == 'error' %}bg-red-50 text-red-700
+          {% else %}bg-gray-100 text-gray-700{% endif %}">
           {{ message }}
         </div>
       {% endfor %}
@@ -18,7 +22,7 @@
     <h1 class="text-2xl font-bold">ตารางงบรายสัปดาห์</h1>
     <div class="flex gap-2">
       <a href="/menus/"
-         class="px-3 py-2 rounded-xl bg-primary text-white hover:bg-primary-dark">
+         class="px-3 py-2 rounded-xl bg-orange-500 text-white hover:bg-orange-600">
         ไปหน้าเมนูทั้งหมด
       </a>
     </div>
@@ -30,7 +34,7 @@
       <a class="px-3 py-1.5 rounded-lg ring-1 ring-gray-200 hover:bg-gray-50"
          href="{% url 'budgets:home' %}?start={{ prev_start|date:'Y-m-d' }}">« สัปดาห์ก่อน</a>
     {% endif %}
-    <div class="px-3 py-1.5">
+    <div class="px-3 py-1.5 font-medium">
       {{ start_date|date:"Y-m-d" }} – {{ end_date|date:"Y-m-d" }}
     </div>
     {% if not restrict %}
@@ -39,36 +43,36 @@
     {% endif %}
   </div>
 
-  <!-- ตารางงบ -->
-  <div class="overflow-x-auto bg-white rounded-2xl ring-1 ring-gray-100">
+  <!-- ตาราง -->
+  <div class="overflow-x-auto bg-white rounded-2xl shadow ring-1 ring-gray-200">
     <table class="min-w-full text-sm">
-      <thead class="bg-orange-50">
+      <thead class="bg-orange-100 text-gray-900">
         <tr class="text-left">
           <th class="px-4 py-3">วันที่</th>
           <th class="px-4 py-3">งบ (฿)</th>
           <th class="px-4 py-3">ใช้ไป (฿)</th>
           <th class="px-4 py-3">คงเหลือ (฿)</th>
           <th class="px-4 py-3">รายการเมนู/ใช้จ่าย</th>
-          <th class="px-4 py-3">จัดการ</th>
+          <th class="px-4 py-3 text-center">จัดการ</th>
         </tr>
       </thead>
       <tbody>
         {% for row in rows %}
-          <tr class="border-t align-top {% if row.is_today %}bg-yellow-50{% endif %}">
-            <td class="px-4 py-3">
+          <tr class="border-t {% if row.is_today %}bg-yellow-50{% else %}{% cycle 'bg-white' 'bg-orange-50' %}{% endif %} hover:bg-orange-100 transition">
+            <td class="px-4 py-3 align-top">
               <div class="font-medium">{{ row.date|date:"Y-m-d" }}</div>
-              <a class="text-primary hover:underline text-xs"
+              <a class="text-orange-600 hover:underline text-xs"
                  href="{% url 'budgets:day_detail' row.date|date:'Y-m-d' %}">
                 ดูรายละเอียด
               </a>
             </td>
-            <td class="px-4 py-3">{{ row.budget_amount }}</td>
-            <td class="px-4 py-3">{{ row.spent_amount }}</td>
+            <td class="px-4 py-3 font-semibold">{{ row.budget_amount }}</td>
+            <td class="px-4 py-3 text-red-600">{{ row.spent_amount }}</td>
             <td class="px-4 py-3">
               {% if row.remain_amount < 0 %}
                 <span class="text-red-600 font-semibold">{{ row.remain_amount }}</span>
               {% else %}
-                {{ row.remain_amount }}
+                <span class="text-green-600 font-semibold">{{ row.remain_amount }}</span>
               {% endif %}
             </td>
             <td class="px-4 py-3">
@@ -90,9 +94,9 @@
                 <div class="text-xs text-gray-500 mt-1">{{ row.advice }}</div>
               {% endif %}
             </td>
-            <td class="px-4 py-3">
+            <td class="px-4 py-3 text-center">
               <a href="{% url 'budgets:set_daily_with_date' row.date|date:'Y-m-d' %}"
-                 class="px-3 py-1.5 rounded-lg ring-1 ring-gray-200 hover:bg-gray-50">
+                 class="px-3 py-1.5 rounded-lg bg-orange-500 text-white hover:bg-orange-600">
                 แก้งบ
               </a>
             </td>
@@ -108,7 +112,7 @@
     </table>
   </div>
 
-  <!-- ปุ่มกลับไปแผนเมนู -->
+  <!-- ปุ่มกลับ -->
   {% if plan_mode %}
     <div class="mt-6">
       <a href="{% url 'plan:summary' %}"
