@@ -6,7 +6,7 @@ from django.contrib import messages
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from .models import DailyBudget, BudgetSpend
+from .models import DailyBudget, BudgetSpend, MealPlan
 from .forms import DailyBudgetForm
 from menus.models import Menu
 
@@ -32,30 +32,33 @@ def _default_budget_from_session(request) -> int:
         return 0
 
 
-def _safe_get_or_create_daily(request, use_date: date):
+def _safe_get_or_create_daily(request, use_date: date, plan: MealPlan | None = None):
     """
-    ดึง/สร้าง DailyBudget ของ user+date แบบปลอดภัย:
+    ดึง/สร้าง DailyBudget ของ user+date+plan แบบปลอดภัย:
     - ถ้ามีหลายแถว (ข้อมูลซ้ำ) จะเลือก id ต่ำสุดมาใช้
     - ถ้าไม่มี -> สร้างใหม่ด้วยงบ default จาก session
     """
-    qs = DailyBudget.objects.filter(user=request.user, date=use_date).order_by('id')
+    qs = DailyBudget.objects.filter(user=request.user, date=use_date, plan=plan).order_by('id')
     if qs.exists():
         return qs.first(), False
     return DailyBudget.objects.create(
         user=request.user,
         date=use_date,
-        amount=_default_budget_from_session(request)
+        amount=_default_budget_from_session(request),
+        plan=plan
     ), True
 
 
 def _plan_range(request):
     """
-    คืน (start_date, end_date) จาก session['plan']
-    ถ้าไม่มี/รูปแบบไม่ถูก -> คืน (None, None)
+    คืน (start_date, end_date, plan_obj) จาก session['plan']
+    ถ้าไม่มี/รูปแบบไม่ถูก -> คืน (None, None, None)
+    จะพยายามใช้ active_plan_id ก่อน ถ้าไม่มีค่อย fallback เป็นแผนล่าสุดของ user
     """
     plan = request.session.get('plan')
     if not plan:
-        return (None, None)
+        return (None, None, None)
+
     start_str = plan.get('start_date') or ''
     days = plan.get('days') or 1
     try:
@@ -67,7 +70,15 @@ def _plan_range(request):
     except Exception:
         days = 1
     e = s + timedelta(days=days - 1)
-    return (s, e)
+
+    plan_obj = None
+    active_id = request.session.get('active_plan_id')
+    if active_id:
+        plan_obj = MealPlan.objects.filter(user=request.user, id=active_id).first()
+    if not plan_obj:
+        plan_obj = MealPlan.objects.filter(user=request.user).order_by('-created_at').first()
+
+    return (s, e, plan_obj)
 
 
 # ----------------- ตารางงบ -----------------
@@ -82,14 +93,14 @@ def budget_table(request):
     plan_mode = (request.GET.get('from_plan') == '1')
 
     if plan_mode:
-        range_start, range_end = _plan_range(request)
+        range_start, range_end, plan_obj = _plan_range(request)
         if not range_start:
             messages.info(request, "ยังไม่มีช่วงแผนในเซสชัน กรุณาเริ่มวางแผนก่อน")
             return redirect("/accounts/home/")
         start_date = range_start
         end_date = range_end
         budgets_qs = DailyBudget.objects.filter(
-            user=request.user, date__range=[range_start, range_end]
+            user=request.user, date__range=[range_start, range_end], plan=plan_obj
         ).order_by('date')
     else:
         start_date = _parse_date_or_today(request.GET.get('start'))
@@ -111,7 +122,7 @@ def budget_table(request):
     for b in budgets_qs:
         spent = spends_map.get(b.date, 0)
         day_spends = (BudgetSpend.objects
-                      .filter(user=request.user, date=b.date)
+                      .filter(user=request.user, date=b.date, plan=b.plan)
                       .select_related('menu')
                       .order_by('-created_at'))
         remain = b.amount - spent
@@ -139,14 +150,6 @@ def budget_table(request):
         rows.append(row)
         if row['is_today']:
             today_row = row
-
-    if today_row:
-        if today_row['over']:
-            messages.error(request, f"วันนี้คุณใช้เกินงบ {abs(today_row['remain_amount'])} บาท")
-        elif today_row['remain_amount'] >= DESSERT_THRESHOLD:
-            messages.success(request, f"วันนี้ยังเหลืองบ {today_row['remain_amount']} บาท — จะสั่งของหวานเพิ่มก็ยังไหว 😉")
-        elif today_row['remain_amount'] > 0:
-            messages.info(request, f"วันนี้เหลืองบ {today_row['remain_amount']} บาท")
 
     return render(request, 'budgets/budget_table.html', {
         'rows': rows,
@@ -195,13 +198,14 @@ def consume_menu(request, menu_id: int):
     menu = get_object_or_404(Menu, pk=menu_id)
     use_date = _parse_date_or_today(request.POST.get('date'))
 
-    _safe_get_or_create_daily(request, use_date)
+    daily, _ = _safe_get_or_create_daily(request, use_date)
 
     BudgetSpend.objects.create(
         user=request.user,
         date=use_date,
         amount=menu.price,
         menu=menu,
+        plan=daily.plan,
         note=f"กินเมนู {menu.name}",
     )
     messages.success(request, f"บันทึก {menu.name} {menu.price} บาท (วันที่ {use_date})")
@@ -222,12 +226,13 @@ def consume_outside(request):
     note = (request.POST.get('note') or '').strip()
     use_date = _parse_date_or_today(request.POST.get('date'))
 
-    _safe_get_or_create_daily(request, use_date)
+    daily, _ = _safe_get_or_create_daily(request, use_date)
 
     BudgetSpend.objects.create(
         user=request.user,
         date=use_date,
         amount=amount,
+        plan=daily.plan,
         note=note or "กินข้างนอก",
     )
     messages.success(request, f"บันทึกการใช้จ่าย {amount} บาท (วันที่ {use_date})")
@@ -243,7 +248,7 @@ def day_detail(request, date_str):
     budget_amount = budget_obj.amount if budget_obj else 0
 
     spends = (BudgetSpend.objects
-              .filter(user=request.user, date=the_date)
+              .filter(user=request.user, date=the_date, plan=budget_obj.plan if budget_obj else None)
               .select_related('menu')
               .order_by('-created_at'))
 

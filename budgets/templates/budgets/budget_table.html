@@ -7,12 +7,14 @@
   {% if messages %}
     <div class="space-y-2 mb-4">
       {% for message in messages %}
-        <div class="px-4 py-3 rounded-xl 
-          {% if message.tags == 'success' %}bg-green-50 text-green-700
-          {% elif message.tags == 'error' %}bg-red-50 text-red-700
-          {% else %}bg-gray-100 text-gray-700{% endif %}">
-          {{ message }}
-        </div>
+        {% ifchanged message %}
+          <div class="px-4 py-3 rounded-xl 
+            {% if message.tags == 'success' %}bg-green-50 text-green-700
+            {% elif message.tags == 'error' %}bg-red-50 text-red-700
+            {% else %}bg-gray-100 text-gray-700{% endif %}">
+            {{ message }}
+          </div>
+        {% endifchanged %}
       {% endfor %}
     </div>
   {% endif %}

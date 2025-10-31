@@ -20,11 +20,21 @@
                   ไม่มีรูป
                 </div>
               {% endif %}
-              <div class="p-4 space-y-1">
+              <div class="p-4 space-y-2">
                 <div class="font-semibold text-gray-900 text-base">{{ m.name }}</div>
                 <div class="text-sm text-gray-700 font-medium">ราคา: {{ m.price }} บาท</div>
+
+                <!-- ✅ dropdown มื้อ -->
+                <select class="meal-select border rounded-lg px-2 py-1 text-sm w-full"
+                        data-id="{{ m.id }}">
+                  <option value="" disabled selected hidden>เลือกมื้อ</option>
+                  <option value="มื้อเช้า">มื้อเช้า</option>
+                  <option value="มื้อเที่ยง">มื้อเที่ยง</option>
+                  <option value="มื้อเย็น">มื้อเย็น</option>
+                </select>
+
                 <button type="button"
-                        class="select-btn px-3 py-1.5 text-sm rounded-lg bg-orange-500 text-white hover:bg-orange-600"
+                        class="select-btn mt-2 px-3 py-1.5 text-sm rounded-lg bg-orange-500 text-white hover:bg-orange-600 w-full"
                         data-id="{{ m.id }}"
                         data-name="{{ m.name }}"
                         data-price="{{ m.price }}"
@@ -93,21 +103,12 @@ document.addEventListener("DOMContentLoaded", () => {
       selectedMenus.forEach(m => {
         remain -= m.price;
         const card = document.createElement("div");
-        card.className = "bg-white shadow-sm rounded-xl overflow-hidden ring-1 ring-gray-200";
-        if (m.image) {
-          const img = document.createElement("img");
-          img.src = m.image;
-          img.className = "w-full h-24 object-cover";
-          card.appendChild(img);
-        }
-        const body = document.createElement("div");
-        body.className = "p-3";
-        body.innerHTML = `
-          <div class="font-bold text-gray-900 text-base">${m.name}</div>
+        card.className = "bg-white shadow-sm rounded-xl overflow-hidden ring-1 ring-gray-200 p-3";
+        card.innerHTML = `
+          <div class="font-bold text-gray-900">${m.meal} | ${m.name}</div>
           <div class="text-sm text-gray-700">ร้าน: ${m.restaurant}</div>
           <div class="text-sm text-orange-600 font-semibold">${m.price} บาท</div>
         `;
-        card.appendChild(body);
         listEl.appendChild(card);
       });
     }
@@ -127,15 +128,25 @@ document.addEventListener("DOMContentLoaded", () => {
 
   buttons.forEach(btn => {
     btn.addEventListener("click", () => {
+      const id = btn.dataset.id;
+      const mealSelect = document.querySelector(`.meal-select[data-id="${id}"]`);
+      const meal = mealSelect ? mealSelect.value : "";
+
+      if (!meal) {
+        alert("กรุณาเลือกมื้อก่อน");
+        return;
+      }
+
       const menu = {
-        id: btn.dataset.id,
+        id: id,
         name: btn.dataset.name,
         price: parseInt(btn.dataset.price),
         image: btn.dataset.image,
         restaurant: btn.dataset.restaurant,
+        meal: meal
       };
 
-      const idx = selectedMenus.findIndex(m => m.id == menu.id);
+      const idx = selectedMenus.findIndex(m => m.id == menu.id && m.meal == menu.meal);
       if (idx >= 0) {
         selectedMenus.splice(idx, 1);
         btn.textContent = "เลือกเมนู";
@@ -150,12 +161,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
       render();
     });
-  });
-
-  // อัปเดต hidden input ก่อน submit
-  const form = document.querySelector("form");
-  form.addEventListener("submit", () => {
-    menusInput.value = JSON.stringify(selectedMenus);
   });
 
   render();

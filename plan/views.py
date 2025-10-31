@@ -1,6 +1,6 @@
 from __future__ import annotations
-from datetime import date
-from typing import Iterable, List, Tuple
+from datetime import date, timedelta
+from typing import List, Tuple
 import json, random
 
 from django.contrib import messages
@@ -9,8 +9,8 @@ from django.shortcuts import redirect, render
 from django.views.decorators.http import require_POST
 from django.utils import timezone
 
-from budgets.models import BudgetSpend, DailyBudget
-from menus.models import Menu, Restaurant   # ✅ import Restaurant
+from budgets.models import BudgetSpend, DailyBudget, MealPlan
+from menus.models import Menu, Restaurant
 from menus.utils import filter_by_plan
 
 
@@ -22,14 +22,13 @@ def _parse_int(v, default: int) -> int:
         return default
 
 
-def _parse_date(s: str | None) -> str:
+def _parse_date(s: str | None) -> date:
     if not s:
-        return timezone.localdate().isoformat()
+        return timezone.localdate()
     try:
-        date.fromisoformat(s)
-        return s
+        return date.fromisoformat(s)
     except Exception:
-        return timezone.localdate().isoformat()
+        return timezone.localdate()
 
 
 # ----------------- views -----------------
@@ -45,7 +44,7 @@ def plan_start(request):
         request.session['plan'] = {
             'days': days,
             'budget': budget,
-            'start_date': start_date,
+            'start_date': start_date.isoformat(),
             'allergies': old.get('allergies', []),
             'dislikes':  old.get('dislikes',  []),
             'religions': old.get('religions', []),
@@ -64,7 +63,7 @@ def plan_diet(request):
         'days': 1, 'budget': 50, 'start_date': timezone.localdate().isoformat()
     })
 
-    allergy_choices  = ["กุ้ง", "นม", "แป้งสาลี", "ไข่", "ถั่ว", "ทะเล (รวม)"]
+    allergy_choices  = ["กุ้ง", "นม", "แป้งสาลี", "ไข่", "ถั่ว", "ทะเล"]
     dislike_choices  = ["หมู", "ไก่", "เห็ด", "หัวหอม", "เครื่องใน", "ผักชี", "กระเทียม", "เนื้อวัว"]
     religion_choices = ["ฮาลาล", "มังสวิรัติ", "อาหารเจ", "หลีกเลี่ยงแอลกอฮอล์"]
 
@@ -99,29 +98,28 @@ def mealplan_summary(request):
     """หน้าสรุปแผน: สุ่มร้าน -> ดึงเมนูของร้าน"""
     plan = request.session.get('plan')
     if not plan:
-        storage = messages.get_messages(request)
-        if not any(m.message == "กรุณาเริ่มวางแผนก่อน" for m in storage):
-            messages.info(request, "กรุณาเริ่มวางแผนก่อน")
+        messages.info(request, "กรุณาเริ่มวางแผนก่อน")
         return redirect('plan:start')
 
     budget = _parse_int(plan.get('budget', 0), 0)
 
-    # ✅ เลือกร้านแบบสุ่ม 3 ร้าน
-    restaurant_ids = list(Restaurant.objects.values_list("id", flat=True))
-    picked_ids = random.sample(restaurant_ids, min(3, len(restaurant_ids)))
+    # สุ่มร้าน 3 ร้าน
+    all_ids = list(Restaurant.objects.values_list("id", flat=True))
+    picked_ids = random.sample(all_ids, min(3, len(all_ids)))
     restaurants = Restaurant.objects.filter(id__in=picked_ids)
 
-    data = []
+    data: List[Tuple[Restaurant, List[Menu]]] = []
     for r in restaurants:
         menus = Menu.objects.filter(restaurant=r)
-        menus = filter_by_plan(menus, plan)
+        menus = filter_by_plan(menus, plan)   # << กรองเมนูตามข้อจำกัด
         if budget > 0:
             menus = menus.filter(price__lte=budget)
-        data.append((r, menus))
+        data.append((r, list(menus)))
 
     return render(request, "plan/summary.html", {
         "plan": plan,
         "restaurant_menus": data,
+        "meal_choices": ["มื้อเช้า", "มื้อเที่ยง", "มื้อเย็น"],
         "today": timezone.localdate(),
     })
 
@@ -129,10 +127,14 @@ def mealplan_summary(request):
 @login_required
 @require_POST
 def save_plan(request):
-    """บันทึกแผนเข้าฐานข้อมูล"""
-    menus_json = request.POST.get("menus", "[]")
+    """
+    รับ selections จาก summary (JSON: [{id, name, price, meal, ...}, ...])
+    -> สร้าง MealPlan ใหม่เสมอ
+    -> สร้าง DailyBudget เฉพาะวันในช่วง (ไม่ซ้ำ)
+    -> บันทึก BudgetSpend ผูกแผน
+    """
     try:
-        menus = json.loads(menus_json)
+        menus = json.loads(request.POST.get("menus", "[]"))
     except json.JSONDecodeError:
         menus = []
 
@@ -140,27 +142,47 @@ def save_plan(request):
         messages.error(request, "กรุณาเลือกเมนูก่อนบันทึก")
         return redirect("plan:summary")
 
-    plan = request.session.get("plan", {})
-    use_date = plan.get("start_date") or date.today().isoformat()
+    sess = request.session.get("plan") or {}
+    start_date = _parse_date(sess.get("start_date"))
+    days = _parse_int(sess.get("days", 1), 1)
+    budget = _parse_int(sess.get("budget", 0), 0)
 
-    daily, _ = DailyBudget.objects.get_or_create(
+    # 1) สร้างแผนใหม่เสมอ
+    plan_obj = MealPlan.objects.create(
         user=request.user,
-        date=use_date,
-        defaults={"amount": int(plan.get("budget") or 0)}
+        start_date=start_date,
+        days=days,
+        budget_per_day=budget,
+        title=sess.get("title", ""),
     )
+    request.session["active_plan_id"] = plan_obj.id
+    request.session.modified = True
 
+    # 2) สร้าง DailyBudget
+    for i in range(days):
+        d = start_date + timedelta(days=i)
+        DailyBudget.objects.update_or_create(
+            user=request.user,
+            date=d,
+            plan=plan_obj,
+            defaults={"amount": budget},
+        )
+
+    # 3) บันทึก BudgetSpend
     for m in menus:
         try:
             menu = Menu.objects.get(pk=m["id"])
-            BudgetSpend.objects.create(
-                user=request.user,
-                date=use_date,
-                amount=menu.price,
-                menu=menu,
-                note=f"เลือกในแผน {menu.name}",
-            )
         except Menu.DoesNotExist:
             continue
 
-    messages.success(request, "บันทึกแผนการกินเรียบร้อยแล้ว")
+        BudgetSpend.objects.create(
+            user=request.user,
+            date=start_date,
+            amount=menu.price,
+            menu=menu,
+            plan=plan_obj,
+            note=(m.get("meal") or ""),
+        )
+
+    messages.success(request, "บันทึกแผนเรียบร้อยแล้ว")
     return redirect("/budget/?from_plan=1")
