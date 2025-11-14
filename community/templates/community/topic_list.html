@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Community – ชุมชนอาหาร{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 py-8">
+
+  <!-- ส่วนหัว + ปุ่มสร้างหัวข้อ -->
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-3xl font-bold text-gray-900">
+      ชุมชนอาหารของเรา <span class="text-primary">(Community &amp; Reviews)</span>
+    </h1>
+
+    {% if user.is_authenticated %}
+      <a href="{% url 'community:topic_add' %}"
+         class="px-4 py-2 rounded-xl bg-primary text-white hover:bg-primary-dark text-sm font-semibold">
+        + สร้างหัวข้อใหม่
+      </a>
+    {% endif %}
+  </div>
+
+  <!-- รายการหัวข้อ -->
+  <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+    {% for t in topics %}
+      <a href="{% url 'community:topic_detail' t.id %}"
+         class="bg-white rounded-2xl shadow-card border border-gray-200 overflow-hidden hover:shadow-lg transition">
+        {% if t.cover_image %}
+          <img src="{{ t.cover_image.url }}" alt="{{ t.title }}"
+               class="w-full h-40 object-cover">
+        {% else %}
+          <div class="w-full h-40 bg-primary-light flex items-center justify-center text-primary text-sm">
+            ยังไม่มีรูปหัวข้อ
+          </div>
+        {% endif %}
+
+        <div class="p-4 space-y-1">
+          <h2 class="text-lg font-semibold text-gray-900 line-clamp-1">
+            {{ t.title }}
+          </h2>
+          <p class="text-sm text-gray-500 line-clamp-2">
+            {{ t.description|default:"ยังไม่มีคำอธิบายหัวข้อ" }}
+          </p>
+          <p class="text-xs text-gray-400 mt-1">
+            รีวิวทั้งหมด:
+            <span class="font-semibold text-primary">{{ t.reviews_count }}</span>
+          </p>
+        </div>
+      </a>
+    {% empty %}
+      <!-- ตอนยังไม่มีหัวข้อเลย -->
+      <div class="col-span-full">
+        <div class="bg-white rounded-2xl border border-dashed border-gray-300 px-6 py-10 text-center">
+          <p class="text-gray-700 font-medium mb-2">
+            ยังไม่มีหัวข้อใน Community ตอนนี้
+          </p>
+          <p class="text-gray-500 text-sm mb-4">
+            เริ่มต้นชุมชนอาหารของเราด้วยการสร้างหัวข้อแรกของคุณ
+          </p>
+          {% if user.is_authenticated %}
+            <a href="{% url 'community:topic_add' %}"
+               class="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-primary text-white text-sm font-semibold hover:bg-primary-dark">
+              + สร้างหัวข้อแรกของชุมชน
+            </a>
+          {% endif %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+
+</div>
+{% endblock %}

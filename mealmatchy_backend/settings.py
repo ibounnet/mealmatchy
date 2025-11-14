@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'restaurants',
     'budgets',  
     'plan',
+    'community',
 
 ]
 

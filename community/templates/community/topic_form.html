@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}เพิ่มรีวิวใหม่ – ชุมชนอาหาร{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-8">
+
+  <div class="mb-6">
+    <a href="{% url 'community:topic_detail' topic.id %}"
+       class="text-sm text-gray-500 hover:text-primary">
+      ← กลับไปหน้าหัวข้อ: {{ topic.title }}
+    </a>
+
+    <h1 class="mt-2 text-2xl font-bold text-gray-900">
+      {% if review %}แก้ไขรีวิว{% else %}เพิ่มรีวิวใหม่{% endif %}
+    </h1>
+    <p class="text-sm text-gray-500 mt-1">
+      หัวข้อ: <span class="font-semibold text-primary">{{ topic.title }}</span>
+    </p>
+  </div>
+
+  <div class="bg-white rounded-2xl shadow-card border border-gray-200 p-6">
+    <form method="post" enctype="multipart/form-data" class="space-y-5">
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+        <div class="text-sm text-red-600 mb-2">
+          {{ form.non_field_errors }}
+        </div>
+      {% endif %}
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">
+          ชื่อรีวิว
+        </label>
+        {{ form.title }}
+        <p class="text-xs text-gray-400 mt-1">
+          ตัวอย่าง: “ข้าวหมูกรอบร้านนี้คือที่สุด”
+        </p>
+        {% if form.title.errors %}
+          <p class="text-xs text-red-600 mt-1">{{ form.title.errors.0 }}</p>
+        {% endif %}
+      </div>
+
+      <div class="grid sm:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            ราคา (บาท)
+          </label>
+          {{ form.price }}
+          <p class="text-xs text-gray-400 mt-1">
+            กรอกประมาณราคาต่อจาน/ต่อแก้ว
+          </p>
+          {% if form.price.errors %}
+            <p class="text-xs text-red-600 mt-1">{{ form.price.errors.0 }}</p>
+          {% endif %}
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
+            ให้คะแนน (1–5)
+            <span class="text-xs text-gray-400">(5 = ดีมาก)</span>
+          </label>
+          {{ form.rating }}
+          {% if form.rating.errors %}
+            <p class="text-xs text-red-600 mt-1">{{ form.rating.errors.0 }}</p>
+          {% else %}
+            <p class="text-xs text-gray-400 mt-1">
+              ให้คะแนนเป็นเลขเต็ม 1–5
+            </p>
+          {% endif %}
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">
+          รายละเอียดรีวิว
+        </label>
+        {{ form.body }}
+        {% if form.body.errors %}
+          <p class="text-xs text-red-600 mt-1">{{ form.body.errors.0 }}</p>
+        {% endif %}
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">
+          รูปภาพประกอบ (ถ้ามี)
+        </label>
+        {{ form.image }}
+        <p class="text-xs text-gray-400 mt-1">
+          อัปโหลดรูปอาหารหรือบรรยากาศร้าน (jpg, png)
+        </p>
+        {% if form.image.errors %}
+          <p class="text-xs text-red-600 mt-1">{{ form.image.errors.0 }}</p>
+        {% endif %}
+      </div>
+
+      <div class="flex justify-end gap-3 pt-4">
+        <a href="{% url 'community:topic_detail' topic.id %}"
+           class="px-4 py-2 rounded-xl border border-gray-300 text-sm text-gray-700 hover:bg-gray-50">
+          ยกเลิก
+        </a>
+        <button type="submit"
+                class="px-5 py-2 rounded-xl bg-primary text-white text-sm font-semibold hover:bg-primary-dark">
+          บันทึกรีวิว
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

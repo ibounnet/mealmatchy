@@ -18,6 +18,7 @@ urlpatterns = [
     
     path('recipes/', include(('recipes.urls', 'recipes'), namespace='recipes')),
     path('restaurants/', include(('restaurants.urls', 'restaurants'), namespace='restaurants')),
+    path('community/', include(('community.urls', 'community'), namespace='community')),
 
 
     path('register/', RedirectView.as_view(pattern_name='register', permanent=False)),
