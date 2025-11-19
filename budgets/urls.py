@@ -4,6 +4,7 @@ from . import views
 app_name = "budgets"
 
 urlpatterns = [
+    # ตารางงบรายสัปดาห์ (หน้าแรกของ budgets)
     path("budget/", views.budget_table, name="home"),
 
     # ตั้ง/แก้งบรายวัน

@@ -1,23 +1,36 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.db.models import Q
+
 from .models import Recipe
 from .forms import RecipeForm
 
-@login_required
+
 @login_required
 def recipe_list(request):
-    if request.user.is_staff:
-        recipes = Recipe.objects.all()
-    else:
-        recipes = Recipe.objects.filter(
-            Q(created_by=request.user) | Q(created_by__is_staff=True)
-        )
+    """
+    หน้า 'รวมสูตรอาหาร'
+    - ให้ผู้ใช้ทุกคนเห็นสูตรอาหารของทุกคน
+    """
+    recipes = (
+        Recipe.objects
+        .select_related("created_by", "created_by__profile")
+        .order_by("-created_at")
+    )
+    return render(request, "recipes/recipe_list.html", {"recipes": recipes})
 
-    # ดึงผู้ใช้ + โปรไฟล์มาทีเดียว
-    recipes = recipes.select_related('created_by', 'created_by__profile').order_by('-created_at')
-    return render(request, 'recipes/recipe_list.html', {'recipes': recipes})
+
+@login_required
+def recipe_detail(request, pk):
+    """
+    หน้าดูรายละเอียดสูตรอาหาร 1 รายการ
+    """
+    recipe = get_object_or_404(
+        Recipe.objects.select_related("created_by", "created_by__profile"),
+        pk=pk,
+    )
+    return render(request, "recipes/recipe_detail.html", {"recipe": recipe})
+
 
 @login_required
 def add_recipe(request):
@@ -33,7 +46,9 @@ def add_recipe(request):
         messages.error(request, "กรุณาตรวจสอบข้อมูลให้ถูกต้อง")
     else:
         form = RecipeForm()
+
     return render(request, "recipes/add_recipe.html", {"form": form})
+
 
 @login_required
 def edit_recipe(request, pk):
@@ -56,7 +71,12 @@ def edit_recipe(request, pk):
     else:
         form = RecipeForm(instance=recipe)
 
-    return render(request, "recipes/edit_recipe.html", {"form": form, "recipe": recipe})
+    return render(request, "recipes/add_recipe.html", {  # ใช้ template เดียวกับ add
+        "form": form,
+        "recipe": recipe,
+        "is_edit": True,
+    })
+
 
 @login_required
 def delete_recipe(request, pk):

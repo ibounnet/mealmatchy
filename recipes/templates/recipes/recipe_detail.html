@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}{{ recipe.title }} – สูตรอาหาร{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto px-4 py-8">
+  <a href="{% url 'recipes:list' %}"
+     class="text-sm text-gray-500 hover:text-orange-500">
+    « กลับไปรวมสูตรอาหาร
+  </a>
+
+  <div class="mt-4 bg-white rounded-2xl shadow-card border border-gray-200 overflow-hidden">
+    {% if recipe.image %}
+      <img src="{{ recipe.image.url }}" alt="{{ recipe.title }}"
+           class="w-full h-64 object-cover">
+    {% endif %}
+
+    <div class="p-6 space-y-4">
+      <div class="flex justify-between items-start gap-4">
+        <div>
+          <h1 class="text-2xl font-bold text-gray-900">{{ recipe.title }}</h1>
+          <p class="text-sm text-gray-500 mt-1">
+            {% if recipe.created_by %}
+              โดย <span class="font-medium text-gray-800">
+                {{ recipe.created_by.username }}
+              </span>
+            {% endif %}
+            {% if recipe.created_at %}
+              · {{ recipe.created_at|date:"j F Y" }}
+            {% endif %}
+          </p>
+        </div>
+
+        {% if request.user.is_staff or recipe.created_by_id == request.user.id %}
+          <div class="flex gap-2">
+            <a href="{% url 'recipes:edit' recipe.id %}"
+               class="px-3 py-1 rounded-lg border border-orange-400 text-xs text-orange-600 hover:bg-orange-50">
+              แก้ไข
+            </a>
+            <a href="{% url 'recipes:delete' recipe.id %}"
+               class="px-3 py-1 rounded-lg border border-red-400 text-xs text-red-600 hover:bg-red-50">
+              ลบ
+            </a>
+          </div>
+        {% endif %}
+      </div>
+
+      {% if recipe.description %}
+        <div>
+          <h2 class="text-base font-semibold text-gray-900 mb-1">คำอธิบายสูตร</h2>
+          <p class="text-sm text-gray-700 whitespace-pre-line">
+            {{ recipe.description }}
+          </p>
+        </div>
+      {% endif %}
+
+      {% if recipe.ingredients %}
+        <div>
+          <h2 class="text-base font-semibold text-gray-900 mb-1">ส่วนผสม</h2>
+          <p class="text-sm text-gray-700 whitespace-pre-line">
+            {{ recipe.ingredients }}
+          </p>
+        </div>
+      {% endif %}
+
+      {% if recipe.steps %}
+        <div>
+          <h2 class="text-base font-semibold text-gray-900 mb-1">วิธีทำ</h2>
+          <p class="text-sm text-gray-700 whitespace-pre-line">
+            {{ recipe.steps }}
+          </p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -32,14 +32,21 @@
 
   <!-- ช่วงวันที่ -->
   <div class="flex items-center gap-2 mb-3 text-sm">
-    {% if not restrict %}
+    {% if not plan_mode %}
+      <!-- โหมดปกติ: มีปุ่มเลื่อนสัปดาห์ก่อน/ถัดไป -->
       <a class="px-3 py-1.5 rounded-lg ring-1 ring-gray-200 hover:bg-gray-50"
          href="{% url 'budgets:home' %}?start={{ prev_start|date:'Y-m-d' }}">« สัปดาห์ก่อน</a>
     {% endif %}
+
     <div class="px-3 py-1.5 font-medium">
-      {{ start_date|date:"Y-m-d" }} – {{ end_date|date:"Y-m-d" }}
+      {% if plan_mode %}
+        {{ range_start|date:"Y-m-d" }} – {{ range_end|date:"Y-m-d" }}
+      {% else %}
+        {{ start_date|date:"Y-m-d" }} – {{ next_start|date:"Y-m-d" }}
+      {% endif %}
     </div>
-    {% if not restrict %}
+
+    {% if not plan_mode %}
       <a class="px-3 py-1.5 rounded-lg ring-1 ring-gray-200 hover:bg-gray-50"
          href="{% url 'budgets:home' %}?start={{ next_start|date:'Y-m-d' }}">สัปดาห์ถัดไป »</a>
     {% endif %}
@@ -68,8 +75,15 @@
                 ดูรายละเอียด
               </a>
             </td>
-            <td class="px-4 py-3 font-semibold">{{ row.budget_amount }}</td>
-            <td class="px-4 py-3 text-red-600">{{ row.spent_amount }}</td>
+
+            <td class="px-4 py-3 font-semibold">
+              {{ row.budget_amount }}
+            </td>
+
+            <td class="px-4 py-3 text-red-600">
+              {{ row.spent_amount }}
+            </td>
+
             <td class="px-4 py-3">
               {% if row.remain_amount < 0 %}
                 <span class="text-red-600 font-semibold">{{ row.remain_amount }}</span>
@@ -77,6 +91,7 @@
                 <span class="text-green-600 font-semibold">{{ row.remain_amount }}</span>
               {% endif %}
             </td>
+
             <td class="px-4 py-3">
               <ul class="list-disc list-inside space-y-1">
                 {% for s in row.spends %}
@@ -92,10 +107,12 @@
                   <li class="text-gray-400">-</li>
                 {% endfor %}
               </ul>
+
               {% if row.advice %}
                 <div class="text-xs text-gray-500 mt-1">{{ row.advice }}</div>
               {% endif %}
             </td>
+
             <td class="px-4 py-3 text-center">
               <a href="{% url 'budgets:set_daily_with_date' row.date|date:'Y-m-d' %}"
                  class="px-3 py-1.5 rounded-lg bg-orange-500 text-white hover:bg-orange-600">
@@ -114,7 +131,7 @@
     </table>
   </div>
 
-  <!-- ปุ่มกลับ -->
+  <!-- ปุ่มกลับไปแผนเมนู (โหมดแผนเท่านั้น) -->
   {% if plan_mode %}
     <div class="mt-6">
       <a href="{% url 'plan:summary' %}"
