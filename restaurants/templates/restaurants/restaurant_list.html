@@ -1,15 +1,35 @@
 {% extends 'base.html' %}
 {% block title %}ร้านอาหาร | MealMatchy{% endblock %}
+
 {% block content %}
 <div class="max-w-6xl mx-auto">
+
   <div class="flex items-center justify-between mb-4">
     <h1 class="text-2xl font-bold">ร้านอาหาร</h1>
-    {% if request.user.is_staff %}
-      <a class="px-4 py-2 rounded-xl bg-primary text-white"
-         href="{% url 'restaurants:admin_add_restaurant' %}">
-        + เพิ่มร้าน (แอดมิน)
-      </a>
-    {% endif %}
+
+    <div class="flex gap-2">
+      {# ปุ่มสำหรับ user ทั่วไป: ส่งคำขอเพิ่มร้าน #}
+      {% if request.user.is_authenticated and not request.user.is_staff %}
+        <a class="px-4 py-2 rounded-xl ring-1 ring-primary text-primary hover:bg-primary-light"
+           href="{% url 'restaurants:request_new_restaurant' %}">
+          ส่งคำขอเพิ่มร้าน
+        </a>
+      {% elif not request.user.is_authenticated %}
+        {# ถ้ายังไม่ล็อกอิน แสดงลิงก์ให้ไปล็อกอินก่อน #}
+        <a class="px-4 py-2 rounded-xl ring-1 ring-gray-200 text-sm hover:bg-gray-50"
+           href="{% url 'login' %}">
+          ต้องการเพิ่มร้าน? เข้าสู่ระบบก่อน
+        </a>
+      {% endif %}
+
+      {# ปุ่มสำหรับแอดมิน: เพิ่มร้านตรง ๆ #}
+      {% if request.user.is_staff %}
+        <a class="px-4 py-2 rounded-xl bg-primary text-white"
+           href="{% url 'restaurants:admin_add_restaurant' %}">
+          + เพิ่มร้าน (แอดมิน)
+        </a>
+      {% endif %}
+    </div>
   </div>
 
   <form method="get" class="mb-4 flex gap-2">

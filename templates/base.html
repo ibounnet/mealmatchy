@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <title>{% block title %}MealMatchy{% endblock %}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  {% load static %}
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -21,7 +22,16 @@
   <nav class="bg-white border-b border-gray-100">
     <div class="max-w-6xl mx-auto px-4">
       <div class="h-14 flex items-center justify-between">
-        <a href="{% url 'home' %}" class="font-bold text-primary">MealMatchy</a>
+
+        <!-- โลโก้ + ชื่อเว็บ -->
+        <a href="{% url 'home' %}" class="flex items-center gap-2">
+          <img
+            src="{% static 'img/logo_mealmatchy.png' %}"
+            alt="MealMatchy logo"
+            class="h-8 w-8 object-contain"
+          />
+          <span class="font-bold text-primary">MealMatchy</span>
+        </a>
 
         <div class="flex items-center gap-5 text-sm">
           {% if user.is_authenticated %}
@@ -29,7 +39,6 @@
             <a href="{% url 'menus:menu_list' %}" class="hover:text-primary">เมนูอาหาร</a>
             <a href="{% url 'restaurants:restaurant_list' %}" class="hover:text-primary">ร้านอาหาร</a>
             <a href="{% url 'recipes:list' %}" class="hover:text-primary">สูตรอาหาร</a>
-            <!-- ลิงก์ Community -->
             <a href="{% url 'community:topic_list' %}" class="hover:text-primary">Community</a>
 
             {% if user.is_staff %}

@@ -24,7 +24,6 @@
                 <div class="font-semibold text-gray-900 text-base">{{ m.name }}</div>
                 <div class="text-sm text-gray-700 font-medium">ราคา: {{ m.price }} บาท</div>
 
-                <!-- dropdown มื้อ -->
                 <select class="meal-select border rounded-lg px-2 py-1 text-sm w-full"
                         data-id="{{ m.id }}">
                   <option value="" disabled selected hidden>เลือกมื้อ</option>
@@ -56,10 +55,12 @@
   <div class="mt-4 lg:mt-10">
     <div class="bg-white shadow-md rounded-2xl ring-1 ring-gray-200 p-5">
       <h3 class="text-lg font-bold text-gray-800 mb-3">สรุปงบประมาณ</h3>
-      <p class="text-sm text-gray-700 mb-1">งบต่อวัน:
+      <p class="text-sm text-gray-700 mb-1">
+        งบต่อวัน:
         <span class="font-bold text-red-600">{{ plan.budget }} บาท</span>
       </p>
-      <p class="text-sm text-gray-700 mb-3">งบที่เหลือ:
+      <p class="text-sm text-gray-700 mb-3">
+        งบที่เหลือ:
         <span id="remain-budget" class="font-bold text-red-600">{{ plan.budget }}</span> บาท
       </p>
 
@@ -83,45 +84,27 @@
 
 <script>
 document.addEventListener("DOMContentLoaded", () => {
-  const buttons = document.querySelectorAll(".select-btn");
-  const listEl = document.getElementById("selected-list");
-  const remainEl = document.getElementById("remain-budget");
+  const buttons    = document.querySelectorAll(".select-btn");
+  const listEl     = document.getElementById("selected-list");
+  const remainEl   = document.getElementById("remain-budget");
   const menusInput = document.getElementById("menus-input");
-  const saveBtn = document.getElementById("save-btn");
-  const errorMsg = document.getElementById("error-msg");
-  const budget = parseInt("{{ plan.budget }}");
-  const STORAGE_KEY = "mm_plan_selected";
+  const saveBtn    = document.getElementById("save-btn");
+  const errorMsg   = document.getElementById("error-msg");
+  const budget     = parseInt("{{ plan.budget }}");
 
-  let selectedMenus = [];
-
-  // ---------- โหลดจาก localStorage ถ้ามี ----------
+  // โหลด selection เริ่มต้นจาก server (session / DB)
+  let initialSelected = [];
   try {
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed)) {
-        selectedMenus = parsed;
-      }
-    }
+    initialSelected = JSON.parse('{{ selected_menus_json|escapejs }}') || [];
   } catch (e) {
-    selectedMenus = [];
+    initialSelected = [];
+  }
+  if (!Array.isArray(initialSelected)) {
+    initialSelected = [];
   }
 
-  // sync UI (dropdown + ปุ่ม) จาก selectedMenus
-  function syncUIFromSelected() {
-    selectedMenus.forEach(m => {
-      const btn = document.querySelector(`.select-btn[data-id="${m.id}"]`);
-      const mealSelect = document.querySelector(`.meal-select[data-id="${m.id}"]`);
-      if (mealSelect && m.meal) {
-        mealSelect.value = m.meal;
-      }
-      if (btn) {
-        btn.textContent = "✓ เลือกแล้ว";
-        btn.classList.remove("bg-orange-500");
-        btn.classList.add("bg-green-600");
-      }
-    });
-  }
+  // id เดียวต่อ 1 เมนู (ไม่ให้ซ้ำหลาย meal)
+  let selectedMenus = initialSelected;
 
   function render() {
     listEl.innerHTML = "";
@@ -135,8 +118,8 @@ document.addEventListener("DOMContentLoaded", () => {
         const card = document.createElement("div");
         card.className = "bg-white shadow-sm rounded-xl overflow-hidden ring-1 ring-gray-200 p-3";
         card.innerHTML = `
-          <div class="font-bold text-gray-900">${m.meal} | ${m.name}</div>
-          <div class="text-sm text-gray-700">ร้าน: ${m.restaurant}</div>
+          <div class="font-bold text-gray-900">${m.meal || ""} | ${m.name}</div>
+          <div class="text-sm text-gray-700">ร้าน: ${m.restaurant || "-"}</div>
           <div class="text-sm text-orange-600 font-semibold">${m.price} บาท</div>
         `;
         listEl.appendChild(card);
@@ -146,10 +129,28 @@ document.addEventListener("DOMContentLoaded", () => {
     remainEl.textContent = remain;
     menusInput.value = JSON.stringify(selectedMenus);
 
-    // เก็บลง localStorage ทุกครั้งที่ render
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(selectedMenus));
-    } catch (e) {}
+    // sync ปุ่ม + dropdown ให้ตรงกับ selectedMenus
+    document.querySelectorAll(".select-btn").forEach(btn => {
+      const id = btn.dataset.id;
+      const mealSelect = document.querySelector(`.meal-select[data-id="${id}"]`);
+      const found = selectedMenus.find(m => String(m.id) === String(id));
+
+      if (found) {
+        if (mealSelect) {
+          mealSelect.value = found.meal || "";
+        }
+        btn.textContent = "✓ เลือกแล้ว";
+        btn.classList.remove("bg-orange-500");
+        btn.classList.add("bg-green-600");
+      } else {
+        if (mealSelect) {
+          mealSelect.value = "";
+        }
+        btn.textContent = "เลือกเมนู";
+        btn.classList.remove("bg-green-600");
+        btn.classList.add("bg-orange-500");
+      }
+    });
 
     if (remain < 0) {
       saveBtn.disabled = true;
@@ -172,38 +173,32 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      const menu = {
-        id: id,
-        name: btn.dataset.name,
-        price: parseInt(btn.dataset.price),
-        image: btn.dataset.image,
-        restaurant: btn.dataset.restaurant,
-        meal: meal,
-      };
+      const price = parseInt(btn.dataset.price);
+      const idx = selectedMenus.findIndex(m => String(m.id) === String(id));
 
-      const idx = selectedMenus.findIndex(m => m.id == menu.id && m.meal == menu.meal);
       if (idx >= 0) {
-        // เอาออก
-        selectedMenus.splice(idx, 1);
-        btn.textContent = "เลือกเมนู";
-        btn.classList.remove("bg-green-600");
-        btn.classList.add("bg-orange-500");
-        if (mealSelect) {
-          mealSelect.value = "";
+        // ถ้าเลือกเมนูเดิม + meal เดิม → toggle ออก
+        if (selectedMenus[idx].meal === meal) {
+          selectedMenus.splice(idx, 1);
+        } else {
+          // ถ้าเปลี่ยนมื้อ → อัปเดตเฉพาะ field meal
+          selectedMenus[idx].meal = meal;
         }
       } else {
-        // เพิ่ม
-        selectedMenus.push(menu);
-        btn.textContent = "✓ เลือกแล้ว";
-        btn.classList.remove("bg-orange-500");
-        btn.classList.add("bg-green-600");
+        selectedMenus.push({
+          id: id,
+          name: btn.dataset.name,
+          price: price,
+          image: btn.dataset.image || "",
+          restaurant: btn.dataset.restaurant || "",
+          meal: meal
+        });
       }
 
       render();
     });
   });
 
-  syncUIFromSelected();
   render();
 });
 </script>

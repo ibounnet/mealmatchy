@@ -6,13 +6,12 @@ from .views import (
 )
 
 urlpatterns = [
-    path('home/', home_view, name='home'),
+    # ถ้าอยากให้ /accounts/home/ ยังใช้ได้ ให้เปลี่ยนชื่อเป็น accounts_home
+    path('home/', home_view, name='accounts_home'),
 
     path('register/', register_view, name='register'),
     path('login/',    login_view,    name='login'),
     path('logout/',   logout_view,   name='logout'),
 
     path('profile/', profile_view, name='profile'),
-
-    
 ]

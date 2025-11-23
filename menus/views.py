@@ -95,6 +95,7 @@ def delete_menu(request, pk):
     return render(request, 'menus/delete_menu.html', {'menu': menu})
 
 
+# menus/views.py (มีแล้ว)
 @login_required
 def add_menu_to_restaurant(request, pk):
     restaurant = get_object_or_404(Restaurant, pk=pk, is_active=True)
@@ -103,7 +104,7 @@ def add_menu_to_restaurant(request, pk):
         if form.is_valid():
             m = form.save(commit=False)
             m.restaurant = restaurant
-            m.restaurant_name = restaurant.name  # back-compat
+            m.restaurant_name = restaurant.name
             m.created_by = request.user
             if request.user.is_staff:
                 m.status = Menu.Status.APPROVED
@@ -118,7 +119,11 @@ def add_menu_to_restaurant(request, pk):
             return redirect('restaurants:restaurant_detail', pk=restaurant.pk)
     else:
         form = MenuForm()
-    return render(request, 'menus/add_menu_to_restaurant.html', {'form': form, 'restaurant': restaurant})
+    return render(
+        request,
+        'menus/add_menu_to_restaurant.html',
+        {'form': form, 'restaurant': restaurant}
+    )
 
 
 # ============================

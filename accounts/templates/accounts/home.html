@@ -3,6 +3,7 @@
 
 {% block content %}
 
+<!-- ปุ่มเริ่มวางแผนมื้ออาหาร -->
 <div class="flex items-center justify-center my-8">
   <button id="openPlanModal"
           class="inline-flex items-center gap-3 px-8 py-4 rounded-2xl bg-primary text-white hover:bg-primary-dark shadow-lg text-lg font-bold">
@@ -15,10 +16,16 @@
 
 <hr class="border-none h-px bg-gradient-to-r from-transparent via-orange-200 to-transparent mb-6">
 
+<!-- เมนูแนะนำในงบ -->
 <div class="max-w-6xl mx-auto">
-  <h2 class="text-lg font-semibold text-gray-800 mb-2">
-    เมนูแนะนำในงบ (Budget Menu Highlight)
-  </h2>
+  <div class="flex items-center justify-between mb-2">
+    <h2 class="text-lg font-semibold text-gray-800">
+      เมนูแนะนำในงบ (Budget Menu Highlight)
+    </h2>
+    <p class="text-xs text-gray-500">
+      แสดงเมนูราคาไม่เกิน {{ budget }} บาท
+    </p>
+  </div>
 
   {% if menus %}
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -32,9 +39,15 @@
             </div>
           {% endif %}
           <div class="p-4 space-y-1">
-            <div class="text-xs text-gray-500">ร้าน: {{ m.restaurant_name|default:"-" }}</div>
-            <div class="font-semibold text-gray-900">{{ m.name }}</div>
-            <div class="text-sm text-primary-dark font-bold">{{ m.price }} บาท</div>
+            <div class="text-xs text-gray-500">
+              ร้าน: {{ m.restaurant_name|default:"-" }}
+            </div>
+            <div class="font-semibold text-gray-900">
+              {{ m.name }}
+            </div>
+            <div class="text-sm text-primary-dark font-bold">
+              {{ m.price }} บาท
+            </div>
           </div>
         </div>
       {% endfor %}
@@ -42,6 +55,25 @@
   {% else %}
     <div class="text-gray-500">ยังไม่มีเมนูแนะนำ</div>
   {% endif %}
+</div>
+
+<!-- กล่องแนะนำ Community -->
+<div class="max-w-6xl mx-auto mt-12">
+  <div class="bg-white rounded-2xl ring-1 ring-gray-100 shadow-sm p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+    <div>
+      <h2 class="text-lg font-semibold text-gray-800">
+        คอมมูนิตี้ของคุณ จาก Community ของ MealMatchy
+      </h2>
+      <p class="text-sm text-gray-600 mt-1">
+        พื้นที่แชร์เมนูสุดคุ้ม รีวิวร้านอาหารใกล้มหาลัย และไลฟ์สไตล์คนงบน้อยแบบจริงจัง
+      </p>
+    </div>
+
+    <a href="{% url 'community:topic_list' %}"
+       class="px-4 py-2 rounded-xl bg-white text-primary border border-primary hover:bg-primary hover:text-white transition text-sm font-medium">
+      ไปที่ Community
+    </a>
+  </div>
 </div>
 
 <!-- MODAL: เริ่มวางแผน -->
@@ -54,7 +86,6 @@
       <p class="text-xl mt-1 text-gray-700">เริ่มวางแผนมื้ออาหาร</p>
     </div>
 
-    <!-- เปลี่ยน action ให้ถูกต้อง -->
     <form method="post" action="{% url 'plan:start' %}">
       {% csrf_token %}
       <input type="hidden" id="daysField" name="days" value="1">
@@ -104,8 +135,8 @@
     const daysField = document.getElementById('daysField');
     const startDate = document.getElementById('startDate');
 
-    function openModal(){ modal.classList.remove('hidden'); }
-    function closeModal(){ modal.classList.add('hidden'); }
+    function openModal () { modal.classList.remove('hidden'); }
+    function closeModal () { modal.classList.add('hidden'); }
 
     openBtn?.addEventListener('click', openModal);
     closeBtn?.addEventListener('click', closeModal);
@@ -123,7 +154,8 @@
 
     const t = new Date();
     const iso = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
-    startDate.min = iso; startDate.value = iso;
+    startDate.min = iso;
+    startDate.value = iso;
   })();
 </script>
 

@@ -1,78 +1,126 @@
+{# recipes/templates/recipes/add_recipe.html #}
 {% extends "base.html" %}
 {% load static %}
-{% block title %}{% if is_edit %}แก้ไขสูตรอาหาร{% else %}เพิ่มสูตรอาหาร{% endif %}{% endblock %}
+
+{% block title %}{{ title }}{% endblock %}
 
 {% block content %}
-<div class="max-w-3xl mx-auto">
+<div class="max-w-3xl mx-auto py-8">
 
-  <h1 class="text-2xl font-bold text-gray-900 mb-4">
-    {% if is_edit %}แก้ไขสูตรอาหาร{% else %}เพิ่มสูตรอาหาร{% endif %}
-  </h1>
+  {# แสดงข้อความแจ้งเตือนจาก messages #}
+  {% if messages %}
+    <div class="space-y-2 mb-6">
+      {% for message in messages %}
+        <div class="px-4 py-3 rounded-xl
+          {% if message.tags == 'success' %} bg-green-50 text-green-700
+          {% elif message.tags == 'error' %} bg-red-50 text-red-700
+          {% else %} bg-gray-100 text-gray-700 {% endif %}">
+          {{ message }}
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
 
-  <form method="post"
-        enctype="multipart/form-data"
-        class="bg-white rounded-2xl shadow-card border border-gray-200 p-6 space-y-4">
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-3xl font-bold">{{ title }}</h1>
+    <a href="{% url 'recipes:list' %}"
+       class="px-4 py-2 rounded-xl ring-1 ring-gray-200 text-sm hover:bg-gray-50">
+      กลับไปหน้ารวมสูตร
+    </a>
+  </div>
+
+  <form method="post" enctype="multipart/form-data"
+        class="bg-white p-6 rounded-2xl shadow-card border border-gray-100 space-y-5">
     {% csrf_token %}
-
     {{ form.non_field_errors }}
 
     <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1">
-        ชื่อเมนู / ชื่อสูตรอาหาร
-      </label>
-      {{ form.title.errors }}
+      <label class="block text-sm font-medium mb-1">ชื่อเมนู / ชื่อสูตรอาหาร</label>
       {{ form.title }}
+      {% for e in form.title.errors %}
+        <p class="text-red-600 text-sm">{{ e }}</p>
+      {% endfor %}
     </div>
 
     <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1">
-        คำอธิบายสั้น ๆ
-      </label>
-      {{ form.description.errors }}
+      <label class="block text-sm font-medium mb-1">ชื่อร้าน / แหล่งที่มา (ไม่บังคับ)</label>
+      {{ form.restaurant_name }}
+      {% for e in form.restaurant_name.errors %}
+        <p class="text-red-600 text-sm">{{ e }}</p>
+      {% endfor %}
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium mb-1">คำอธิบายสั้น ๆ</label>
       {{ form.description }}
+      {% for e in form.description.errors %}
+        <p class="text-red-600 text-sm">{{ e }}</p>
+      {% endfor %}
     </div>
 
     <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1">
-        ประเภทอาหาร
-      </label>
-      {{ form.category.errors }}
-      {{ form.category }}
-    </div>
-
-    <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1">
-        ส่วนผสม
-      </label>
-      {{ form.ingredients.errors }}
+      <label class="block text-sm font-medium mb-1">ส่วนผสม</label>
       {{ form.ingredients }}
+      {% for e in form.ingredients.errors %}
+        <p class="text-red-600 text-sm">{{ e }}</p>
+      {% endfor %}
+      <p class="text-xs text-gray-400 mt-1">
+        แนะนำให้พิมพ์บรรทัดละ 1 รายการ เช่น “หมูสับ 150 กรัม”
+      </p>
     </div>
 
     <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1">
-        วิธีทำ
-      </label>
-      {{ form.steps.errors }}
+      <label class="block text-sm font-medium mb-1">วิธีทำ</label>
       {{ form.steps }}
+      {% for e in form.steps.errors %}
+        <p class="text-red-600 text-sm">{{ e }}</p>
+      {% endfor %}
+      <p class="text-xs text-gray-400 mt-1">
+        แนะนำให้พิมพ์บรรทัดละ 1 ขั้นตอน เพื่อให้อ่านง่าย
+      </p>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div>
+        <label class="block text-sm font-medium mb-1">จำนวนที่เสิร์ฟ</label>
+        {{ form.servings }}
+        {% for e in form.servings.errors %}
+          <p class="text-red-600 text-sm">{{ e }}</p>
+        {% endfor %}
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-1">เวลาตั้งเตรียม (นาที)</label>
+        {{ form.prep_minutes }}
+        {% for e in form.prep_minutes.errors %}
+          <p class="text-red-600 text-sm">{{ e }}</p>
+        {% endfor %}
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-1">เวลาในการปรุง (นาที)</label>
+        {{ form.cook_minutes }}
+        {% for e in form.cook_minutes.errors %}
+          <p class="text-red-600 text-sm">{{ e }}</p>
+        {% endfor %}
+      </div>
     </div>
 
     <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1">
-        รูปภาพเมนู (ถ้ามี)
-      </label>
-      {{ form.image.errors }}
+      <label class="block text-sm font-medium mb-1">รูปภาพเมนู (ถ้ามี)</label>
       {{ form.image }}
+      {% for e in form.image.errors %}
+        <p class="text-red-600 text-sm">{{ e }}</p>
+      {% endfor %}
     </div>
 
-    <div class="flex justify-end gap-2 pt-2">
+    <div class="flex gap-3 mt-4">
+      <button type="submit"
+              class="px-4 py-2 rounded-xl bg-primary text-white hover:bg-primary-dark">
+        {{ submit_text }}
+      </button>
       <a href="{% url 'recipes:list' %}"
-         class="px-4 py-2 rounded-xl border border-gray-300 text-sm text-gray-700 hover:bg-gray-50">
+         class="px-4 py-2 rounded-xl ring-1 ring-gray-200 text-sm hover:bg-gray-50">
         ยกเลิก
       </a>
-      <button type="submit"
-              class="px-4 py-2 rounded-xl bg-orange-500 text-white text-sm font-semibold hover:bg-orange-600">
-        {% if is_edit %}บันทึกการแก้ไข{% else %}บันทึกสูตรอาหาร{% endif %}
-      </button>
     </div>
   </form>
 </div>

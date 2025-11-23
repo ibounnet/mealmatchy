@@ -17,4 +17,6 @@ urlpatterns = [
 
     path("review/<int:pk>/comment/add/", views.comment_add, name="comment_add"),
     path("comment/<int:pk>/delete/", views.comment_delete, name="comment_delete"),
+
+    
 ]

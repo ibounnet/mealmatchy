@@ -16,11 +16,10 @@ from menus.models import Menu
 
 # ====================== HOME ======================
 
-@login_required
 def home_view(request):
     """
-    หน้าแรก: แสดงปุ่ม 'เริ่มวางแผนมื้ออาหาร' และเมนูแนะนำตามงบ
-    อ่านงบจาก query string ?budget=50 (default = 50)
+    หน้าแรก: แสดงปุ่ม 'เริ่มวางแผนมื้ออาหาร', เมนูแนะนำในงบ และกล่องแนะนำ Community
+    ใส่งบผ่าน query string ?budget=50 (default = 50)
     """
     try:
         budget = int(request.GET.get('budget', 50))
@@ -31,6 +30,7 @@ def home_view(request):
         Menu.objects.filter(price__lte=budget)
         .order_by('-created_at')[:12]
     )
+
     return render(request, 'accounts/home.html', {
         'budget': budget,
         'menus': menus,
@@ -57,7 +57,7 @@ def login_view(request):
         form = LoginForm(request, data=request.POST)
         if form.is_valid():
             login(request, form.get_user())
-            return redirect('home')
+            return redirect('home')   # กลับหน้าแรกหลังล็อกอิน
         messages.error(request, "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง")
     else:
         form = LoginForm(request)
@@ -96,5 +96,3 @@ def profile_view(request):
         'pform': pform,
         'profile': profile,
     })
-
-

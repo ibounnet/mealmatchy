@@ -21,20 +21,15 @@ def staff_required(view_func):
 def topic_list(request):
     """
     หน้าแรก Community
-    - staff เห็นทุกหัวข้อที่ is_active=True
-    - user ทั่วไป เห็นเฉพาะหัวข้อที่อนุมัติแล้ว (status='approved')
-      หรือหัวข้อที่ตัวเองเป็นคนสร้าง
+
+    ตอนนี้ตั้งค่าให้ user ทุกคนเห็นหัวข้อของทุกคน
+    (ถ้าไม่อยากโชว์หัวข้อที่ปิดไปจริง ๆ ให้ตั้ง is_active=False แล้วกรองด้วย is_active=True)
     """
-    base_qs = Topic.objects.filter(is_active=True)
-
-    if request.user.is_staff:
-        topics = base_qs
-    else:
-        topics = base_qs.filter(
-            Q(status="approved") | Q(created_by=request.user)
-        )
-
-    topics = topics.annotate(reviews_count=Count("reviews"))
+    topics = (
+        Topic.objects.all()              # เห็นทุกหัวข้อ
+        .annotate(reviews_count=Count("reviews"))
+        .order_by("-created_at")
+    )
 
     return render(request, "community/topic_list.html", {
         "topics": topics,
@@ -47,26 +42,18 @@ def topic_list(request):
 def topic_add(request):
     """
     user สร้างหัวข้อได้
-    - ถ้าเป็น staff สร้างแล้วให้อนุมัติเลย (status='approved')
-    - ถ้าเป็น user ทั่วไป ให้ตั้งสถานะเป็น pending รอ staff อนุมัติ
+    ตอนนี้จะถือว่า “อนุมัติทันที” ให้ทุกคนเห็นเลย (status='approved')
+    ถ้าอยากกลับไปมีระบบอนุมัติ สามารถเปลี่ยน logic ตรงนี้ทีหลังได้
     """
     if request.method == "POST":
         form = TopicForm(request.POST, request.FILES)
         if form.is_valid():
             topic = form.save(commit=False)
             topic.created_by = request.user
-            if request.user.is_staff:
-                topic.status = "approved"
-            else:
-                topic.status = "pending"
+            topic.status = "approved"    # อนุมัติทันที
             topic.is_active = True
             topic.save()
-            messages.success(
-                request,
-                "ส่งหัวข้อเรียบร้อย กำลังรอการอนุมัติจากผู้ดูแล"
-                if not request.user.is_staff
-                else "สร้างหัวข้อเรียบร้อย"
-            )
+            messages.success(request, "สร้างหัวข้อเรียบร้อย")
             return redirect("community:topic_detail", pk=topic.pk)
     else:
         form = TopicForm()
@@ -81,7 +68,6 @@ def topic_edit(request, pk):
     """
     แก้ไขหัวข้อ
     - ทำได้เฉพาะคนสร้างหัวข้อเอง หรือ staff
-    - ถ้าไม่ใช่ staff เมื่อแก้ไขแล้วให้กลับไปเป็น pending รออนุมัติใหม่
     """
     topic = get_object_or_404(Topic, pk=pk)
 
@@ -92,13 +78,9 @@ def topic_edit(request, pk):
         form = TopicForm(request.POST, request.FILES, instance=topic)
         if form.is_valid():
             t = form.save(commit=False)
-            if request.user.is_staff:
-                # staff แก้แล้วให้คงสถานะเดิม ถ้าอยากให้อนุมัติทันที
-                if t.status == "pending":
-                    t.status = "approved"
-            else:
-                # user แก้ไข -> กลับไป pending
-                t.status = "pending"
+            # แก้ไขแล้วให้ยังคง approved อยู่
+            if t.status != "approved":
+                t.status = "approved"
             t.save()
             messages.success(request, "แก้ไขหัวข้อเรียบร้อย")
             return redirect("community:topic_detail", pk=topic.pk)
@@ -138,20 +120,14 @@ def topic_delete(request, pk):
 def topic_detail(request, pk):
     """
     หน้ารายละเอียดหัวข้อ + รายการรีวิว
-    - ถ้าเป็นหัวข้อที่ยังไม่ได้ approved:
-        - owner ของหัวข้อและ staff ดูได้
-        - คนอื่นห้ามดู
-    - รีวิว:
-        - staff เห็นทุก status
-        - user เห็นเฉพาะ review ที่ approved หรือที่ตัวเองเขียน
+
+    ตอนนี้เปิดให้ user ทุกคนเข้าอ่านหัวข้อได้
+    (ยกเว้นถ้าอยาก soft delete ให้ตั้ง is_active=False แล้วบัง)
     """
     topic = get_object_or_404(Topic, pk=pk)
 
-    if (
-        not request.user.is_staff
-        and topic.status != "approved"
-        and topic.created_by != request.user
-    ):
+    # ถ้าอยากบังหัวข้อที่ปิดไปจริง ๆ
+    if not topic.is_active:
         raise Http404()
 
     keyword = request.GET.get("q", "").strip()
@@ -161,10 +137,10 @@ def topic_detail(request, pk):
         comments_count=Count("comments"),
     )
 
-    if not request.user.is_staff:
-        reviews = reviews.filter(
-            Q(status="approved") | Q(author=request.user)
-        )
+    # ถ้ายังอยากให้เห็นทุกรีวิวของทุกคนเลย ก็ไม่ต้องกรองตาม status
+    # ถ้าอยากกรองให้เห็นเฉพาะ approved ให้เปิดบรรทัดนี้แทน
+    # if not request.user.is_staff:
+    #     reviews = reviews.filter(Q(status="approved") | Q(author=request.user))
 
     if keyword:
         reviews = reviews.filter(
@@ -185,17 +161,9 @@ def topic_detail(request, pk):
 def review_add(request, pk):
     """
     เพิ่มรีวิวให้หัวข้อ
-    - หัวข้อที่ยังไม่ approved: ให้รีวิวได้เฉพาะ owner + staff
-    - ทุกรีวิวของ user ทั่วไปจะเริ่มด้วย status='pending'
+    ตอนนี้อนุมัติทันที (status='approved') ให้ทุกคนเห็น
     """
     topic = get_object_or_404(Topic, pk=pk)
-
-    if (
-        not request.user.is_staff
-        and topic.status != "approved"
-        and topic.created_by != request.user
-    ):
-        raise Http404()
 
     if request.method == "POST":
         form = ReviewForm(request.POST, request.FILES)
@@ -203,12 +171,9 @@ def review_add(request, pk):
             review = form.save(commit=False)
             review.topic = topic
             review.author = request.user
-            review.status = "pending"
+            review.status = "approved"
             review.save()
-            messages.success(
-                request,
-                "ส่งรีวิวเรียบร้อย กำลังรอการอนุมัติจากผู้ดูแล"
-            )
+            messages.success(request, "เพิ่มรีวิวเรียบร้อยแล้ว")
             return redirect("community:topic_detail", pk=topic.pk)
     else:
         form = ReviewForm()
@@ -224,7 +189,6 @@ def review_edit(request, pk):
     """
     แก้ไขรีวิว
     - เจ้าของรีวิวหรือ staff เท่านั้น
-    - ถ้าเจ้าของแก้ไข ให้กลับเป็น pending
     """
     review = get_object_or_404(Review, pk=pk)
 
@@ -235,8 +199,7 @@ def review_edit(request, pk):
         form = ReviewForm(request.POST, request.FILES, instance=review)
         if form.is_valid():
             r = form.save(commit=False)
-            if not request.user.is_staff:
-                r.status = "pending"
+            r.status = "approved"
             r.save()
             messages.success(request, "แก้ไขรีวิวเรียบร้อย")
             return redirect("community:topic_detail", pk=review.topic_id)
@@ -322,13 +285,10 @@ def review_like_toggle(request, pk):
     return redirect("community:topic_detail", pk=review.topic_id)
 
 
-# ================== MODERATION (เฉพาะ STAFF) ==================
+# ================== MODERATION (เฉพาะ STAFF – ถ้าอยากใช้ทีหลังยังเก็บไว้ได้) ==================
 
 @staff_required
 def topic_moderation_list(request):
-    """
-    หน้าให้ staff ตรวจหัวข้อที่สถานะ pending
-    """
     topics = Topic.objects.filter(status="pending").order_by("created_at")
     return render(request, "community/topic_moderation_list.html", {
         "topics": topics,
@@ -337,9 +297,6 @@ def topic_moderation_list(request):
 
 @staff_required
 def topic_approve(request, pk):
-    """
-    staff กดอนุมัติหัวข้อ
-    """
     topic = get_object_or_404(Topic, pk=pk)
     topic.status = "approved"
     topic.is_active = True
@@ -349,9 +306,6 @@ def topic_approve(request, pk):
 
 @staff_required
 def topic_reject(request, pk):
-    """
-    staff ปฏิเสธหัวข้อ
-    """
     topic = get_object_or_404(Topic, pk=pk)
     topic.status = "rejected"
     topic.save()
@@ -360,9 +314,6 @@ def topic_reject(request, pk):
 
 @staff_required
 def review_moderation_list(request):
-    """
-    หน้าให้ staff ตรวจรีวิวที่สถานะ pending
-    """
     reviews = Review.objects.filter(status="pending").order_by("created_at")
     return render(request, "community/review_moderation_list.html", {
         "reviews": reviews,
@@ -371,9 +322,6 @@ def review_moderation_list(request):
 
 @staff_required
 def review_approve(request, pk):
-    """
-    staff อนุมัติรีวิว
-    """
     review = get_object_or_404(Review, pk=pk)
     review.status = "approved"
     review.save()
@@ -382,9 +330,6 @@ def review_approve(request, pk):
 
 @staff_required
 def review_reject(request, pk):
-    """
-    staff ปฏิเสธรีวิว
-    """
     review = get_object_or_404(Review, pk=pk)
     review.status = "rejected"
     review.save()

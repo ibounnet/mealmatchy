@@ -1,38 +1,63 @@
 {% extends 'base.html' %}
 {% block title %}{{ title }}{% endblock %}
+
 {% block content %}
 <div class="max-w-2xl mx-auto">
   <h1 class="text-2xl font-bold mb-6">{{ title }}</h1>
-  <form method="post" enctype="multipart/form-data" class="bg-white p-6 rounded-2xl ring-1 ring-gray-100 space-y-4">
+
+  <form method="post" enctype="multipart/form-data"
+        class="bg-white p-6 rounded-2xl ring-1 ring-gray-100 space-y-4">
     {% csrf_token %}
     {{ form.non_field_errors }}
+
     <div>
       <label class="block text-sm font-medium mb-1">ชื่อร้าน</label>
       {{ form.name }}
-      {% for e in form.name.errors %}<p class="text-red-600 text-sm">{{ e }}</p>{% endfor %}
+      {% for e in form.name.errors %}
+        <p class="text-red-600 text-sm">{{ e }}</p>
+      {% endfor %}
     </div>
+
     <div>
       <label class="block text-sm font-medium mb-1">ที่ตั้ง</label>
       {{ form.location }}
-      {% for e in form.location.errors %}<p class="text-red-600 text-sm">{{ e }}</p>{% endfor %}
+      {% for e in form.location.errors %}
+        <p class="text-red-600 text-sm">{{ e }}</p>
+      {% endfor %}
     </div>
+
     <div>
       <label class="block text-sm font-medium mb-1">รายละเอียด</label>
       {{ form.description }}
-      {% for e in form.description.errors %}<p class="text-red-600 text-sm">{{ e }}</p>{% endfor %}
+      {% for e in form.description.errors %}
+        <p class="text-red-600 text-sm">{{ e }}</p>
+      {% endfor %}
     </div>
+
     <div>
       <label class="block text-sm font-medium mb-1">รูปภาพ</label>
       {{ form.image }}
-      {% for e in form.image.errors %}<p class="text-red-600 text-sm">{{ e }}</p>{% endfor %}
+      {% for e in form.image.errors %}
+        <p class="text-red-600 text-sm">{{ e }}</p>
+      {% endfor %}
     </div>
 
     <div class="flex gap-2">
-      <button class="px-4 py-2 rounded-xl bg-primary text-white" type="submit">{{ submit_text }}</button>
-      {% if mode|default:''|slice:":5" == 'admin' %}
-        <a class="px-4 py-2 rounded-xl ring-1 ring-gray-200" href="{% url 'restaurants:admin_restaurant_list' %}">ยกเลิก</a>
+      <button class="px-4 py-2 rounded-xl bg-primary text-white" type="submit">
+        {{ submit_text }}
+      </button>
+
+      {# ถ้า mode เป็น admin ให้กลับไปหน้า admin list #}
+      {% if mode == 'admin' %}
+        <a class="px-4 py-2 rounded-xl ring-1 ring-gray-200"
+           href="{% url 'restaurants:admin_restaurant_list' %}">
+          ยกเลิก
+        </a>
       {% else %}
-        <a class="px-4 py-2 rounded-xl ring-1 ring-gray-200" href="{% url 'restaurants:restaurant_list' %}">ยกเลิก</a>
+        <a class="px-4 py-2 rounded-xl ring-1 ring-gray-200"
+           href="{% url 'restaurants:restaurant_list' %}">
+          ยกเลิก
+        </a>
       {% endif %}
     </div>
   </form>
