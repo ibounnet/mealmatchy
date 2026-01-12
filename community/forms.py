@@ -1,3 +1,4 @@
+# community/forms.py
 from django import forms
 from .models import Topic, Review, Comment
 
@@ -29,7 +30,6 @@ class TopicForm(forms.ModelForm):
 class ReviewForm(forms.ModelForm):
     class Meta:
         model = Review
-        # ต้องตรงกับ models.Review
         fields = ["title", "price", "rating", "body", "image"]
         widgets = {
             "title": forms.TextInput(attrs={
@@ -65,7 +65,6 @@ class ReviewForm(forms.ModelForm):
 class CommentForm(forms.ModelForm):
     class Meta:
         model = Comment
-        # ใช้ field 'message' ให้ตรงกับ models.Comment
         fields = ["message"]
         widgets = {
             "message": forms.Textarea(attrs={

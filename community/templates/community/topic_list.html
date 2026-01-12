@@ -1,70 +1,183 @@
 {% extends "base.html" %}
-{% block title %}Community – ชุมชนอาหาร{% endblock %}
+
+{% block title %}Community - ชุมชนอาหาร{% endblock %}
 
 {% block content %}
-<div class="max-w-6xl mx-auto px-4 py-8">
+<div class="max-w-6xl mx-auto py-8">
 
-  <!-- ส่วนหัว + ปุ่มสร้างหัวข้อ -->
+  <!-- หัวข้อบนสุด + ปุ่มสร้างหัวข้อใหม่ -->
   <div class="flex items-center justify-between mb-6">
-    <h1 class="text-3xl font-bold text-gray-900">
-      ชุมชนอาหารของเรา <span class="text-primary">(Community &amp; Reviews)</span>
-    </h1>
+    <div>
+      <h1 class="text-3xl font-bold text-gray-900">
+        ชุมชนอาหารของเรา
+        <span class="text-primary">(Community &amp; Reviews)</span>
+      </h1>
+      <p class="mt-1 text-sm text-gray-500">
+        แบ่งปันร้านอร่อย เมนูเด็ด และประสบการณ์การกินของคุณกับเพื่อน ๆ ในมหาวิทยาลัย
+      </p>
+    </div>
 
-    {% if user.is_authenticated %}
+    {% if request.user.is_authenticated %}
       <a href="{% url 'community:topic_add' %}"
-         class="px-4 py-2 rounded-xl bg-primary text-white hover:bg-primary-dark text-sm font-semibold">
+         class="px-4 py-2 rounded-2xl bg-primary text-white text-sm font-semibold shadow-card hover:bg-primary-dark transition">
         + สร้างหัวข้อใหม่
+      </a>
+    {% else %}
+      <a href="{% url 'login' %}"
+         class="px-4 py-2 rounded-2xl bg-white text-primary text-sm font-semibold ring-1 ring-primary hover:bg-primary-light transition">
+        ล็อกอินเพื่อสร้างหัวข้อ
       </a>
     {% endif %}
   </div>
 
-  <!-- รายการหัวข้อ -->
-  <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-    {% for t in topics %}
-      <a href="{% url 'community:topic_detail' t.id %}"
-         class="bg-white rounded-2xl shadow-card border border-gray-200 overflow-hidden hover:shadow-lg transition">
-        {% if t.cover_image %}
-          <img src="{{ t.cover_image.url }}" alt="{{ t.title }}"
-               class="w-full h-40 object-cover">
-        {% else %}
-          <div class="w-full h-40 bg-primary-light flex items-center justify-center text-primary text-sm">
-            ยังไม่มีรูปหัวข้อ
-          </div>
-        {% endif %}
-
-        <div class="p-4 space-y-1">
-          <h2 class="text-lg font-semibold text-gray-900 line-clamp-1">
-            {{ t.title }}
-          </h2>
-          <p class="text-sm text-gray-500 line-clamp-2">
-            {{ t.description|default:"ยังไม่มีคำอธิบายหัวข้อ" }}
-          </p>
-          <p class="text-xs text-gray-400 mt-1">
-            รีวิวทั้งหมด:
-            <span class="font-semibold text-primary">{{ t.reviews_count }}</span>
-          </p>
-        </div>
-      </a>
-    {% empty %}
-      <!-- ตอนยังไม่มีหัวข้อเลย -->
-      <div class="col-span-full">
-        <div class="bg-white rounded-2xl border border-dashed border-gray-300 px-6 py-10 text-center">
-          <p class="text-gray-700 font-medium mb-2">
-            ยังไม่มีหัวข้อใน Community ตอนนี้
-          </p>
-          <p class="text-gray-500 text-sm mb-4">
-            เริ่มต้นชุมชนอาหารของเราด้วยการสร้างหัวข้อแรกของคุณ
-          </p>
-          {% if user.is_authenticated %}
-            <a href="{% url 'community:topic_add' %}"
-               class="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-primary text-white text-sm font-semibold hover:bg-primary-dark">
-              + สร้างหัวข้อแรกของชุมชน
-            </a>
-          {% endif %}
-        </div>
+  {# ========== หัวข้อของฉัน ========== #}
+  {% if request.user.is_authenticated and my_topics %}
+    <section class="mb-10">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-xl font-semibold text-gray-800">
+          หัวข้อของฉัน
+        </h2>
+        <span class="text-xs text-gray-500">
+          คุณสร้างหัวข้อไว้ทั้งหมด {{ my_topics|length }} หัวข้อ
+        </span>
       </div>
-    {% endfor %}
-  </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for t in my_topics %}
+          <div class="bg-white rounded-2xl shadow-card ring-1 ring-gray-200 overflow-hidden flex flex-col hover:shadow-lg hover:-translate-y-0.5 transition">
+            {% if t.cover_image %}
+              <a href="{% url 'community:topic_detail' t.pk %}">
+                <img src="{{ t.cover_image.url }}"
+                     alt="{{ t.title }}"
+                     class="w-full h-40 object-cover">
+              </a>
+            {% endif %}
+
+            <div class="p-4 flex-1 flex flex-col justify-between space-y-3">
+              <div>
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="px-2 py-0.5 rounded-full bg-orange-50 text-primary text-[11px] border border-orange-200">
+                    หัวข้อของฉัน
+                  </span>
+                  {% if t.status != "approved" %}
+                    <span class="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 text-[11px] border border-amber-200">
+                      สถานะ: {{ t.get_status_display }}
+                    </span>
+                  {% endif %}
+                </div>
+
+                <a href="{% url 'community:topic_detail' t.pk %}"
+                   class="block text-base font-semibold text-gray-900 hover:text-primary">
+                  {{ t.title }}
+                </a>
+
+                <p class="mt-1 text-sm text-gray-600 line-clamp-2">
+                  {{ t.description|default:"ไม่มีคำอธิบาย" }}
+                </p>
+
+                <p class="mt-1 text-xs text-gray-500">
+                  รีวิวทั้งหมด: {{ t.reviews_count }} รีวิว
+                </p>
+              </div>
+
+              <div class="flex items-center justify-between text-xs pt-1 border-t border-gray-100">
+                <span class="text-gray-500">
+                  สร้างเมื่อ {{ t.created_at|date:"d/m/Y" }}
+                </span>
+
+                <div class="flex gap-2">
+                  <a href="{% url 'community:topic_edit' t.pk %}"
+                     class="px-3 py-1 rounded-lg bg-white ring-1 ring-primary text-primary hover:bg-orange-50">
+                    แก้ไข
+                  </a>
+
+                  <form method="post"
+                        action="{% url 'community:topic_delete' t.pk %}"
+                        onsubmit="return confirm('ยืนยันลบหัวข้อนี้หรือไม่?');">
+                    {% csrf_token %}
+                    <button type="submit"
+                            class="px-3 py-1 rounded-lg bg-white ring-1 ring-red-300 text-red-600 hover:bg-red-50">
+                      ลบ
+                    </button>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </section>
+  {% endif %}
+
+  {# ========== หัวข้อทั้งหมดในชุมชน ========== #}
+  <section class="mt-4">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-xl font-semibold text-gray-800">
+        หัวข้อทั้งหมดในชุมชน
+      </h2>
+      {% if not request.user.is_authenticated %}
+        <p class="text-xs text-gray-500">
+          เข้าสู่ระบบเพื่อเขียนรีวิวและสร้างหัวข้อของคุณเอง
+        </p>
+      {% endif %}
+    </div>
+
+    {% if topics %}
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for t in topics %}
+          <div class="bg-white rounded-2xl shadow-card ring-1 ring-gray-200 overflow-hidden flex flex-col hover:shadow-lg hover:-translate-y-0.5 transition">
+            {% if t.cover_image %}
+              <a href="{% url 'community:topic_detail' t.pk %}">
+                <img src="{{ t.cover_image.url }}"
+                     alt="{{ t.title }}"
+                     class="w-full h-40 object-cover">
+              </a>
+            {% endif %}
+
+            <div class="p-4 flex-1 flex flex-col justify-between space-y-3">
+              <div class="space-y-1">
+                <a href="{% url 'community:topic_detail' t.pk %}"
+                   class="block text-base font-semibold text-gray-900 hover:text-primary">
+                  {{ t.title }}
+                </a>
+
+                <p class="text-sm text-gray-600 line-clamp-2">
+                  {{ t.description|default:"ไม่มีคำอธิบาย" }}
+                </p>
+
+                <p class="text-xs text-gray-500">
+                  โดย {{ t.created_by.username|default:"ไม่ระบุ" }}
+                  • รีวิว {{ t.reviews_count }} รายการ
+                </p>
+              </div>
+
+              <div class="flex items-center justify-between text-xs pt-1 border-t border-gray-100">
+                <span class="text-gray-500">
+                  สร้างเมื่อ {{ t.created_at|date:"d/m/Y" }}
+                </span>
+
+                {% if request.user.is_authenticated and t.created_by_id == request.user.id %}
+                  <span class="px-2 py-0.5 rounded-full bg-orange-50 text-primary border border-orange-200 text-[11px]">
+                    หัวข้อของฉัน
+                  </span>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="bg-white rounded-2xl p-8 text-center ring-1 ring-gray-200">
+        <p class="text-gray-600">ยังไม่มีหัวข้อในชุมชน</p>
+        {% if request.user.is_authenticated %}
+          <a href="{% url 'community:topic_add' %}"
+             class="mt-4 inline-flex items-center px-4 py-2 rounded-xl bg-primary text-white hover:bg-primary-dark">
+            + สร้างหัวข้อแรกของคุณ
+          </a>
+        {% endif %}
+      </div>
+    {% endif %}
+  </section>
 
 </div>
 {% endblock %}

@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}ประวัติการค้นหา{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto">
+
+  <div class="flex items-start justify-between gap-4 mb-4">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">ประวัติการค้นหา</h1>
+      <p class="text-sm text-gray-500">เก็บคำค้น + ตัวกรอง เพื่อย้อนกลับมาใช้งานได้จริง</p>
+    </div>
+
+    <form method="post" action="{% url 'searches:history_clear' %}">
+      {% csrf_token %}
+      <button type="submit"
+              class="px-4 py-2 rounded-lg bg-red-50 text-red-700 ring-1 ring-red-200 hover:bg-red-100 font-semibold text-sm">
+        ล้างประวัติทั้งหมด
+      </button>
+    </form>
+  </div>
+
+  {% if items %}
+    <div class="space-y-4">
+      {% for it in items %}
+        <div class="bg-white rounded-2xl shadow-sm ring-1 ring-gray-200 p-5">
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <div class="text-sm text-gray-500">คำค้น</div>
+              <div class="text-base font-semibold text-gray-900">
+                {% if it.query %}{{ it.query }}{% else %}<span class="text-gray-400">ไม่มีคำค้น</span>{% endif %}
+              </div>
+
+              <div class="mt-2 text-xs text-gray-500">
+                วันที่ค้น: {{ it.created_at|date:"d M Y H:i" }}
+                {% if it.result_count %}
+                  <span class="ml-2">ผลลัพธ์: {{ it.result_count }}</span>
+                {% endif %}
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <a href="{% url 'searches:history_rerun' it.id %}"
+                 class="px-3 py-1.5 rounded-lg bg-orange-50 text-orange-700 ring-1 ring-orange-200 hover:bg-orange-100 text-sm font-semibold">
+                ค้นซ้ำ
+              </a>
+
+              <form method="post" action="{% url 'searches:history_delete' it.id %}">
+                {% csrf_token %}
+                <button type="submit"
+                        class="px-3 py-1.5 rounded-lg bg-gray-50 text-gray-700 ring-1 ring-gray-200 hover:bg-gray-100 text-sm font-semibold">
+                  ลบ
+                </button>
+              </form>
+            </div>
+          </div>
+
+          {% if it.filters_pairs %}
+            <div class="mt-4">
+              <div class="text-sm font-semibold text-gray-800 mb-2">ตัวกรอง</div>
+              <div class="flex flex-wrap gap-2">
+                {% for k, v in it.filters_pairs %}
+                  <span class="text-xs px-2 py-1 rounded-full bg-gray-50 ring-1 ring-gray-200">
+                    {{ k }}: {{ v }}
+                  </span>
+                {% endfor %}
+              </div>
+            </div>
+          {% else %}
+            <div class="mt-4 text-sm text-gray-400">ไม่มีตัวกรอง</div>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="bg-white rounded-2xl shadow-sm ring-1 ring-gray-200 p-8 text-center text-gray-500">
+      ยังไม่มีประวัติการค้นหา
+    </div>
+  {% endif %}
+
+</div>
+{% endblock %}

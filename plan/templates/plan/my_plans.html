@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}แผนมื้ออาหารของฉัน{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 py-8">
+
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">แผนมื้ออาหารของฉัน</h1>
+      <p class="text-sm text-gray-600">ดูแผนย้อนหลัง และสลับแผนที่กำลังใช้งานอยู่</p>
+    </div>
+    <a href="{% url 'plan:summary' %}"
+       class="px-4 py-2 rounded-xl bg-orange-500 text-white hover:bg-orange-600 text-sm font-semibold">
+      ไปหน้าแผน (Summary)
+    </a>
+  </div>
+
+  <div class="bg-white rounded-2xl ring-1 ring-gray-200 shadow-sm overflow-hidden">
+    <table class="min-w-full text-sm">
+      <thead class="bg-orange-100 text-gray-900">
+        <tr>
+          <th class="px-4 py-3 text-left">ช่วงแผน</th>
+          <th class="px-4 py-3 text-left">จำนวนวัน</th>
+          <th class="px-4 py-3 text-left">งบ/วัน</th>
+          <th class="px-4 py-3 text-left">สถานะ</th>
+          <th class="px-4 py-3 text-center">จัดการ</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for it in items %}
+          <tr class="border-b border-gray-100 {% if it.is_active %}bg-orange-50{% endif %}">
+            <td class="px-4 py-3">
+              <div class="font-medium text-gray-900">
+                {{ it.start|date:"Y-m-d" }} – {{ it.end|date:"Y-m-d" }}
+              </div>
+              <div class="text-xs text-gray-500">
+                สร้างเมื่อ {{ it.plan.created_at|date:"Y-m-d H:i" }}
+              </div>
+            </td>
+
+            <td class="px-4 py-3">{{ it.plan.days }}</td>
+            <td class="px-4 py-3">{{ it.plan.budget_per_day }}</td>
+
+            <td class="px-4 py-3">
+              {% if it.is_active %}
+                <span class="text-green-700 bg-green-50 px-2 py-1 rounded-lg text-xs font-semibold">กำลังใช้งาน</span>
+              {% elif it.in_range %}
+                <span class="text-orange-700 bg-orange-50 px-2 py-1 rounded-lg text-xs font-semibold">อยู่ในช่วงแผน</span>
+              {% else %}
+                <span class="text-gray-600 bg-gray-50 px-2 py-1 rounded-lg text-xs font-semibold">ย้อนหลัง/ยังไม่ถึง</span>
+              {% endif %}
+            </td>
+
+            <td class="px-4 py-3 text-center">
+              <a href="{% url 'plan:use_plan' it.plan.id %}"
+                 class="px-3 py-1.5 rounded-lg bg-orange-500 text-white hover:bg-orange-600 text-sm">
+                ใช้แผนนี้
+              </a>
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="5" class="px-4 py-6 text-center text-gray-500">
+              ยังไม่มีแผนมื้ออาหาร
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+</div>
+{% endblock %} 

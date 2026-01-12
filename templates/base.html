@@ -18,13 +18,14 @@
     };
   </script>
 </head>
+
 <body class="bg-gray-50 text-gray-900">
   <nav class="bg-white border-b border-gray-100">
     <div class="max-w-6xl mx-auto px-4">
-      <div class="h-14 flex items-center justify-between">
+      <div class="h-14 flex items-center justify-between gap-4">
 
         <!-- โลโก้ + ชื่อเว็บ -->
-        <a href="{% url 'home' %}" class="flex items-center gap-2">
+        <a href="{% url 'home' %}" class="flex items-center gap-2 shrink-0">
           <img
             src="{% static 'img/logo_mealmatchy.png' %}"
             alt="MealMatchy logo"
@@ -33,7 +34,31 @@
           <span class="font-bold text-primary">MealMatchy</span>
         </a>
 
-        <div class="flex items-center gap-5 text-sm">
+        {% if user.is_authenticated %}
+          <!-- Search Bar (ศูนย์กลาง) -->
+          <form action="{% url 'searches:search' %}" method="get"
+                class="hidden lg:flex items-center flex-1 max-w-xl">
+            <div class="flex w-full items-center gap-2">
+              <input name="q"
+                     value="{{ request.GET.q|default:'' }}"
+                     class="w-full border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-200"
+                     placeholder="ค้นหาเมนู / ร้าน / สูตรอาหาร / กระทู้..." />
+              <select name="scope"
+                      class="border border-gray-200 rounded-lg px-3 py-2 bg-white">
+                <option value="all">ทั้งหมด</option>
+                <option value="menus">เมนู</option>
+                <option value="restaurants">ร้านอาหาร</option>
+                <option value="recipes">สูตรอาหาร</option>
+                <option value="community">Community</option>
+              </select>
+              <button class="px-4 py-2 rounded-lg bg-primary text-white hover:bg-primary-dark font-semibold">
+                ค้นหา
+              </button>
+            </div>
+          </form>
+        {% endif %}
+
+        <div class="flex items-center gap-5 text-sm shrink-0">
           {% if user.is_authenticated %}
             <a href="{% url 'home' %}" class="hover:text-primary">หน้าแรก</a>
             <a href="{% url 'menus:menu_list' %}" class="hover:text-primary">เมนูอาหาร</a>
@@ -52,18 +77,73 @@
               </a>
             {% endif %}
 
-            <a href="{% url 'profile' %}" class="hover:text-primary">โปรไฟล์</a>
-            <a href="{% url 'logout' %}" class="px-3 py-1.5 rounded-lg bg-primary text-white hover:bg-primary-dark">
-              ออกจากระบบ
+            <!-- ปุ่มค้นหา (มือถือ) -->
+            <a href="{% url 'searches:search' %}"
+               class="lg:hidden px-3 py-1.5 rounded-lg ring-1 ring-gray-200 hover:bg-gray-50">
+              ค้นหา
             </a>
+
+            <!-- Profile Dropdown -->
+            <div class="relative" id="profile-dd">
+              <button type="button"
+                      id="profile-dd-btn"
+                      class="flex items-center gap-2 hover:text-primary px-3 py-1.5 rounded-lg ring-1 ring-gray-200 bg-white">
+                โปรไฟล์
+                <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clip-rule="evenodd"/>
+                </svg>
+              </button>
+
+              <div id="profile-dd-menu"
+                   class="hidden absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg ring-1 ring-gray-200 overflow-hidden z-50">
+                <a href="{% url 'profile' %}"
+                   class="block px-4 py-2.5 hover:bg-gray-50 text-gray-800">
+                  ข้อมูลโปรไฟล์
+                </a>
+
+                <a href="{% url 'plan:my_plans' %}" class="block px-4 py-3 text-sm hover:bg-gray-50">
+                  แผนมื้ออาหารของฉัน
+                </a>
+                
+                <a href="{% url 'searches:history_list' %}"
+                   class="block px-4 py-2.5 hover:bg-gray-50 text-gray-800">
+                  ประวัติการค้นหา
+                </a>
+
+                <div class="h-px bg-gray-100"></div>
+
+                <a href="{% url 'logout' %}"
+                   class="block px-4 py-2.5 hover:bg-gray-50 text-red-600 font-semibold">
+                  ออกจากระบบ
+                </a>
+              </div>
+            </div>
+
           {% else %}
             <a href="{% url 'login' %}" class="hover:text-primary">เข้าสู่ระบบ</a>
-            <a href="{% url 'register' %}" class="px-3 py-1.5 rounded-lg bg-primary text-white hover:bg-primary-dark">
+            <a href="{% url 'register' %}"
+               class="px-3 py-1.5 rounded-lg bg-primary text-white hover:bg-primary-dark">
               สมัครสมาชิก
             </a>
           {% endif %}
         </div>
       </div>
+
+      {% if user.is_authenticated %}
+        <!-- Search Bar สำหรับมือถือ (แสดงใต้ navbar) -->
+        <div class="lg:hidden pb-4">
+          <form action="{% url 'searches:search' %}" method="get" class="flex gap-2">
+            <input name="q"
+                   value="{{ request.GET.q|default:'' }}"
+                   class="flex-1 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-200"
+                   placeholder="ค้นหาเมนู / ร้าน / สูตร..." />
+            <button class="px-4 py-2 rounded-lg bg-primary text-white hover:bg-primary-dark font-semibold">
+              ค้นหา
+            </button>
+          </form>
+        </div>
+      {% endif %}
+
     </div>
   </nav>
 
@@ -82,5 +162,30 @@
     {% endif %}
     {% block content %}{% endblock %}
   </main>
+
+  <script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const btn = document.getElementById("profile-dd-btn");
+    const menu = document.getElementById("profile-dd-menu");
+    const wrap = document.getElementById("profile-dd");
+    if (!btn || !menu || !wrap) return;
+
+    function closeMenu() { menu.classList.add("hidden"); }
+    function toggleMenu() { menu.classList.toggle("hidden"); }
+
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleMenu();
+    });
+
+    document.addEventListener("click", (e) => {
+      if (!wrap.contains(e.target)) closeMenu();
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closeMenu();
+    });
+  });
+  </script>
 </body>
 </html>

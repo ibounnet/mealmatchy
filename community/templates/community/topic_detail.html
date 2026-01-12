@@ -10,10 +10,17 @@
     </h1>
   </div>
 
-  <a href="{% url 'community:review_add' topic.id %}"
-     class="px-4 py-2 rounded-xl bg-green-500 text-white hover:bg-green-600 text-sm">
-    + เพิ่มรีวิว
-  </a>
+  {% if user.is_authenticated %}
+    <a href="{% url 'community:review_add' topic.id %}"
+       class="px-4 py-2 rounded-xl bg-green-500 text-white hover:bg-green-600 text-sm">
+      + เพิ่มรีวิว
+    </a>
+  {% else %}
+    <a href="{% url 'login' %}"
+       class="px-4 py-2 rounded-xl bg-green-500 text-white hover:bg-green-600 text-sm">
+      เข้าสู่ระบบเพื่อเพิ่มรีวิว
+    </a>
+  {% endif %}
 </div>
 
 <!-- Search bar -->
@@ -23,6 +30,19 @@
          class="w-full rounded-xl border border-gray-200 px-4 py-2 text-sm
                 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white"/>
 </form>
+
+{% if messages %}
+  <div class="space-y-2 mb-4">
+    {% for message in messages %}
+      <div class="px-4 py-2 rounded-xl text-sm
+        {% if message.tags == 'success' %}bg-green-50 text-green-700
+        {% elif message.tags == 'error' %}bg-red-50 text-red-700
+        {% else %}bg-gray-50 text-gray-700{% endif %}">
+        {{ message }}
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}
 
 <!-- รายการรีวิว -->
 <div class="space-y-4">
@@ -50,7 +70,6 @@
               {{ r.title }}
             </h2>
             <div class="flex items-center gap-2 text-xs text-gray-500">
-              <!-- ดาว rating -->
               <div class="flex items-center gap-0.5 text-yellow-400">
                 {% for i in "12345" %}
                   {% if forloop.counter <= r.rating %}★{% else %}☆{% endif %}
@@ -62,7 +81,6 @@
             </div>
           </div>
 
-          <!-- ปุ่มแก้ไข/ลบ (ถ้าเป็นคนเขียนหรือ staff) -->
           {% if user.is_staff or r.author_id == user.id %}
             <div class="flex gap-2 text-xs">
               <a href="{% url 'community:review_edit' r.id %}"
@@ -78,9 +96,8 @@
           "{{ r.body|linebreaksbr }}"
         </p>
 
-        <!-- แถบล่าง: ผู้เขียน + like + comment + anchor -->
+        <!-- แถบล่าง -->
         <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2 pt-2 border-t border-gray-100">
-          <!-- ผู้เขียน -->
           <div class="flex items-center gap-2 text-xs text-gray-500">
             <div class="w-7 h-7 rounded-full bg-gray-200 overflow-hidden">
               {% if r.author.profile.profile_picture %}
@@ -96,20 +113,26 @@
             </div>
           </div>
 
-          <!-- ปุ่ม like / นับ comment -->
           <div class="flex items-center gap-4 text-xs text-gray-500">
-            <a href="{% url 'community:review_like' r.id %}"
-               class="flex items-center gap-1 hover:text-red-500">
-              <span>♥</span>
-              <span>{{ r.likes_count }}</span>
-            </a>
+            {% if user.is_authenticated %}
+              <a href="{% url 'community:review_like' r.id %}"
+                 class="flex items-center gap-1 hover:text-red-500">
+                <span>♥</span>
+                <span>{{ r.likes_count }}</span>
+              </a>
+            {% else %}
+              <div class="flex items-center gap-1 opacity-60">
+                <span>♥</span>
+                <span>{{ r.likes_count }}</span>
+              </div>
+            {% endif %}
+
             <div class="flex items-center gap-1">
               <span>💬</span>
               <span>{{ r.comments_count }}</span>
             </div>
           </div>
 
-          <!-- anchor ดูทั้งหมด -->
           <div class="text-xs text-gray-400 md:text-right">
             <a href="#review-{{ r.id }}" class="hover:text-primary">ดูรีวิวทั้งหมด</a>
           </div>
@@ -125,13 +148,15 @@
                        class="w-6 h-6 object-cover">
                 {% endif %}
               </div>
+
               <div class="flex-1 bg-gray-50 rounded-xl px-3 py-2">
                 <div class="flex justify-between items-center">
                   <span class="font-medium text-gray-700">{{ c.user.username }}</span>
                   <span class="text-[10px] text-gray-400">{{ c.created_at|date:"d/m/Y H:i" }}</span>
                 </div>
-                <!-- ใช้ field 'text' ให้ตรงกับ model -->
-                <p class="mt-0.5 text-gray-700">{{ c.text }}</p>
+
+                <!-- ✅ สำคัญ: ใช้ message -->
+                <p class="mt-0.5 text-gray-700">{{ c.message }}</p>
 
                 {% if user.is_staff or c.user_id == user.id %}
                   <form method="post"
@@ -152,22 +177,27 @@
         </div>
 
         <!-- ฟอร์มเพิ่มคอมเมนต์ -->
-        <form method="post"
-              action="{% url 'community:comment_add' r.id %}"
-              class="mt-2">
-          {% csrf_token %}
-          <div class="flex gap-2">
-            <!-- ชื่อ field ต้องเป็น 'text' ให้ตรงกับ CommentForm / Comment model -->
-            <input type="text" name="text"
-                   placeholder="แสดงความคิดเห็นเกี่ยวกับเมนูนี้..."
-                   class="flex-1 rounded-xl border border-gray-200 px-3 py-1.5 text-xs
-                          focus:outline-none focus:ring-1 focus:ring-primary focus:border-transparent">
-            <button type="submit"
-                    class="px-3 py-1.5 rounded-xl bg-primary text-white text-xs hover:bg-primary-dark">
-              ส่ง
-            </button>
-          </div>
-        </form>
+        <div class="mt-2">
+          {% if user.is_authenticated %}
+            <form method="post"
+                  action="{% url 'community:comment_add' r.id %}">
+              {% csrf_token %}
+              <div class="flex gap-2 items-start">
+                <div class="flex-1">
+                  {{ comment_form.message }}
+                </div>
+                <button type="submit"
+                        class="px-3 py-2 rounded-xl bg-primary text-white text-xs hover:bg-primary-dark">
+                  ส่ง
+                </button>
+              </div>
+            </form>
+          {% else %}
+            <p class="text-xs text-gray-500">
+              ต้องเข้าสู่ระบบก่อนถึงจะคอมเมนต์ได้
+            </p>
+          {% endif %}
+        </div>
 
       </div>
     </div>

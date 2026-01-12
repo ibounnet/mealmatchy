@@ -12,7 +12,7 @@ from restaurants.models import Restaurant
 from .models import Menu
 from .forms import MenuForm
 from .utils import filter_by_plan
-
+from searches.services import log_search
 
 # ============================
 # เมนูฝั่งผู้ใช้ทั่วไป
@@ -36,6 +36,51 @@ def menu_list(request):
         'budget': budget or '',
         'plan': plan or {},
     })
+
+def menu_list(request):
+    q = (request.GET.get("q") or "").strip()
+    category = request.GET.get("category") or ""
+    restaurant = request.GET.get("restaurant") or ""
+    budget = request.GET.get("budget") or ""
+
+    qs = Menu.objects.all()
+
+    if q:
+        qs = qs.filter(name__icontains=q)
+
+    if category:
+        qs = qs.filter(category__id=category)
+
+    if restaurant:
+        qs = qs.filter(restaurant__id=restaurant)
+
+    if budget:
+        try:
+            qs = qs.filter(price__lte=float(budget))
+        except Exception:
+            pass
+
+    # คำนวณจำนวนผลลัพธ์
+    result_count = qs.count()
+
+    # บันทึกประวัติ (เฉพาะตอนเป็น GET และมีการ “ค้น/กรอง” จริง)
+    has_search_intent = any([q, category, restaurant, budget])
+    if request.method == "GET" and has_search_intent and request.user.is_authenticated:
+        filters = {
+            "category": category,
+            "restaurant": restaurant,
+            "budget": budget,
+        }
+        log_search(
+            user=request.user,
+            path=request.path,
+            keyword=q,
+            filters=filters,
+            result_count=result_count,
+        )
+
+    return render(request, "menus/menu_list.html", {"menus": qs})
+
 
 
 @login_required

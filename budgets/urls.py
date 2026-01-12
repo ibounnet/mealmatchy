@@ -7,6 +7,9 @@ urlpatterns = [
     # ตารางงบรายสัปดาห์ (หน้าแรกของ budgets)
     path("budget/", views.budget_table, name="home"),
 
+    # Dashboard สรุป 7 วัน
+    path("budget/summary/", views.weekly_summary, name="weekly_summary"),
+
     # ตั้ง/แก้งบรายวัน
     path("budget/set/", views.set_daily_budget, name="set_daily"),
     path("budget/set/<slug:date_str>/", views.set_daily_budget, name="set_daily_with_date"),

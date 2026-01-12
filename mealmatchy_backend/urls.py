@@ -29,6 +29,8 @@ urlpatterns = [
     path('login/',    RedirectView.as_view(pattern_name='login', permanent=False)),
     path('logout/', RedirectView.as_view(pattern_name='logout', permanent=False)),
 
+    path("", include("searches.urls")),
+    
 ]
 
 if settings.DEBUG:

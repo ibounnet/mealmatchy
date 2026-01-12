@@ -2,161 +2,216 @@
 {% block title %}รายละเอียดงบของวันที่ {{ date|date:"Y-m-d" }}{% endblock %}
 
 {% block content %}
-<div class="max-w-6xl mx-auto px-4 py-8">
+<div class="max-w-6xl mx-auto">
 
-  <!-- หัวข้อบนสุด -->
-  <h1 class="text-2xl md:text-3xl font-extrabold text-center mb-2">
-    รายละเอียดงบของวันที่ {{ date|date:"j F Y" }}
-  </h1>
-  <p class="text-center text-sm md:text-base text-gray-700 mb-6">
-    งบ: <span class="font-semibold">{{ budget_amount }} ฿</span>
-    · ใช้ไป: <span class="font-semibold">{{ spent_sum }} ฿</span>
-    · คงเหลือ:
-    {% if remain < 0 %}
-      <span class="text-red-600 font-bold">{{ remain }} ฿</span>
-    {% else %}
-      <span class="text-green-600 font-bold">{{ remain }} ฿</span>
+  <div class="text-center mt-6 mb-6">
+    <h1 class="text-2xl font-bold">
+      รายละเอียดงบของวันที่
+      <span class="text-orange-600">{{ date|date:"d" }}</span>
+      {{ date|date:"F Y" }}
+    </h1>
+    <p class="mt-2 text-sm">
+      งบ: {{ budget_amount }} ฿ · ใช้ไป:
+      <span class="text-red-600">{{ spent_sum }} ฿</span>
+      · คงเหลือ:
+      {% if remain < 0 %}
+        <span class="text-red-600 font-semibold">{{ remain }} ฿</span>
+      {% else %}
+        <span class="text-green-600 font-semibold">{{ remain }} ฿</span>
+      {% endif %}
+    </p>
+
+    {% if plan_mode and plan %}
+      <p class="mt-1 text-xs text-gray-500">
+        โหมดแผน: เริ่ม {{ plan.start_date|date:"Y-m-d" }} ({{ plan.days }} วัน)
+      </p>
     {% endif %}
-  </p>
+  </div>
 
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
 
-    <!-- ซ้าย: แผนมื้ออาหารของวันนี้ / รายการในแผน -->
     <div class="lg:col-span-2">
-      <div class="bg-white rounded-2xl shadow-card border border-gray-200 px-5 py-5 md:px-6 md:py-6">
-        <h2 class="text-lg md:text-xl font-bold text-gray-900 mb-1">
+      <div class="bg-white rounded-2xl shadow-card ring-1 ring-gray-200 p-6">
+        <h2 class="text-lg font-bold mb-2">
           แผนมื้ออาหารของวันนี้ / รายการในแผน
         </h2>
-        <p class="text-xs md:text-sm text-gray-500 mb-4">
-          แสดงจากการกินที่บันทึกเข้ากับแผน แยกตามมื้ออาหารในแต่ละวัน
+        <p class="text-xs text-gray-500 mb-4">
+          แสดงจากการกินที่บันทึกกับแผน แยกตามมื้ออาหารในแต่ละวัน
         </p>
 
-        {% if meal_groups.0.items or meal_groups.1.items or meal_groups.2.items or other_spends %}
-          <div class="space-y-5">
+        {% for g in meal_groups %}
+          <div class="mb-5 border-t border-gray-100 pt-4">
+            <div class="text-sm font-semibold mb-2">{{ g.label }}</div>
 
-            {% for g in meal_groups %}
-              {% if g.items %}
-                <div>
-                  <h3 class="text-sm md:text-base font-semibold text-gray-800 mb-2">
-                    {{ g.label }}
-                  </h3>
-
-                  <div class="space-y-2">
-                    {% for s in g.items %}
-                      <div class="flex items-center gap-3 px-3 py-2 rounded-2xl hover:bg-gray-50 border border-gray-100">
-                        {% if s.menu and s.menu.image %}
-                          <img src="{{ s.menu.image.url }}"
-                               alt="{{ s.menu.name }}"
-                               class="w-10 h-10 md:w-12 md:h-12 rounded-xl object-cover flex-shrink-0">
-                        {% endif %}
-
-                        <div class="flex-1">
-                          <div class="text-sm md:text-base font-medium text-gray-900">
-                            {% if s.menu %}{{ s.menu.name }}{% else %}รายการอาหาร{% endif %}
-                          </div>
-                          <p class="text-[11px] md:text-xs text-gray-500 mt-0.5">
-                            ใช้จ่ายเวลา {{ s.created_at|time:"H:i" }}
-                          </p>
+            {% if g.items %}
+              <ul class="space-y-2">
+                {% for s in g.items %}
+                  <li class="flex items-center justify-between bg-orange-50/40 rounded-xl px-3 py-2">
+                    <div class="flex items-center gap-3">
+                      {% if s.menu and s.menu.image %}
+                        <img src="{{ s.menu.image.url }}" alt="{{ s.menu.name }}"
+                             class="w-12 h-12 rounded-lg object-cover">
+                      {% endif %}
+                      <div>
+                        <div class="text-sm font-medium">
+                          {% if s.menu %}
+                            {{ s.menu.name }}
+                          {% else %}
+                            รายการในแผน
+                          {% endif %}
                         </div>
-
-                        <div class="text-sm md:text-base text-orange-600 font-semibold">
-                          {{ s.amount }} ฿
-                        </div>
-                      </div>
-                    {% endfor %}
-                  </div>
-                </div>
-              {% endif %}
-            {% endfor %}
-
-            {% if other_spends %}
-              <div class="pt-3 border-t border-gray-100">
-                <h3 class="text-sm md:text-base font-semibold text-gray-800 mb-2">รายการอื่น ๆ</h3>
-                <div class="space-y-2">
-                  {% for s in other_spends %}
-                    <div class="flex items-center gap-3 px-3 py-2 rounded-2xl hover:bg-gray-50 border border-gray-100">
-                      <div class="flex-1">
-                        <div class="text-sm md:text-base font-medium text-gray-900">
-                          {% if s.menu %}{{ s.menu.name }}{% else %}รายการใช้จ่าย{% endif %}
-                        </div>
-                        <p class="text-[11px] md:text-xs text-gray-500 mt-0.5">
+                        <div class="text-[11px] text-gray-500">
                           ใช้จ่ายเวลา {{ s.created_at|time:"H:i" }}
-                        </p>
-                      </div>
-                      <div class="text-sm md:text-base text-orange-600 font-semibold">
-                        {{ s.amount }} ฿
+                        </div>
                       </div>
                     </div>
-                  {% endfor %}
-                </div>
-              </div>
-            {% endif %}
 
+                    <div class="flex items-center gap-3">
+                      <div class="text-sm font-semibold text-orange-600">
+                        {{ s.amount }} ฿
+                      </div>
+
+                      <form method="post"
+                            action="{% url 'budgets:delete_spend' s.id %}{% if plan_mode %}?from_plan=1{% endif %}">
+                        {% csrf_token %}
+                        <button type="submit"
+                                class="text-xs px-2 py-1 rounded-lg bg-red-50 text-red-600 hover:bg-red-100">
+                          ลบ
+                        </button>
+                      </form>
+                    </div>
+                  </li>
+                {% endfor %}
+              </ul>
+            {% else %}
+              <p class="text-xs text-gray-400">ยังไม่ได้เลือกเมนูสำหรับมื้อนี้</p>
+            {% endif %}
           </div>
-        {% else %}
-          <p class="text-sm text-gray-400 mt-6 text-center">
-            ยังไม่มีเมนูในแผนหรือรายการใช้จ่ายสำหรับวันนี้
-          </p>
-        {% endif %}
+        {% endfor %}
+
+        <div class="mt-6 border-t border-gray-100 pt-4">
+          <h3 class="text-sm font-semibold mb-2">รายการอื่น ๆ</h3>
+
+          {% if other_spends %}
+            <ul class="space-y-2 mb-4">
+              {% for s in other_spends %}
+                <li class="flex items-center justify-between bg-gray-50 rounded-xl px-3 py-2">
+                  <div>
+                    <div class="text-sm font-medium">
+                      {{ s.note|default:"รายการใช้จ่าย" }}
+                    </div>
+                    <div class="text-[11px] text-gray-500">
+                      ใช้จ่ายเวลา {{ s.created_at|time:"H:i" }}
+                    </div>
+                  </div>
+
+                  <div class="flex items-center gap-3">
+                    <div class="text-sm font-semibold text-orange-600">
+                      {{ s.amount }} ฿
+                    </div>
+
+                    <form method="post"
+                          action="{% url 'budgets:delete_spend' s.id %}{% if plan_mode %}?from_plan=1{% endif %}">
+                      {% csrf_token %}
+                      <button type="submit"
+                              class="text-xs px-2 py-1 rounded-lg bg-red-50 text-red-600 hover:bg-red-100">
+                        ลบ
+                      </button>
+                    </form>
+                  </div>
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p class="text-xs text-gray-400 mb-3">
+              ยังไม่มีรายการอื่น ๆ ในวันนี้
+            </p>
+          {% endif %}
+
+          <form method="post"
+                action="{% url 'budgets:consume_outside' %}{% if plan_mode %}?from_plan=1{% endif %}"
+                class="flex flex-col sm:flex-row gap-2 mt-2">
+            {% csrf_token %}
+            <input type="hidden" name="date" value="{{ date|date:'Y-m-d' }}">
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+
+            <input type="text" name="note"
+                   placeholder="เช่น น้ำเปล่า ขนมเล็ก ๆ ฯลฯ"
+                   class="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+
+            <input type="number" name="amount" min="0" step="1"
+                   placeholder="จำนวนเงิน"
+                   class="w-32 rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+
+            <button type="submit"
+                    class="px-4 py-2 rounded-xl bg-primary text-white text-sm font-semibold hover:bg-primary-dark">
+              เพิ่มรายการ
+            </button>
+          </form>
+        </div>
+
+        <div class="mt-6 flex flex-wrap gap-3">
+          {% if plan_mode %}
+            <a href="/budget/?from_plan=1"
+               class="px-4 py-2 rounded-xl ring-1 ring-gray-200 text-sm hover:bg-gray-50">
+              « กลับตารางของแผน
+            </a>
+          {% else %}
+            <a href="/budget/?start={{ week_start|date:'Y-m-d' }}"
+               class="px-4 py-2 rounded-xl ring-1 ring-gray-200 text-sm hover:bg-gray-50">
+              « กลับตารางสัปดาห์
+            </a>
+          {% endif %}
+
+          <a href="{% url 'plan:summary' %}"
+             class="px-4 py-2 rounded-xl ring-1 ring-gray-200 text-sm hover:bg-gray-50">
+            ← กลับไปแผนเมนู
+          </a>
+        </div>
       </div>
     </div>
 
-    <!-- ขวา: เมนู/สูตรอาหารแนะนำ -->
     <div>
-      <div class="bg-white rounded-2xl shadow-card border border-gray-200 px-5 py-5 md:px-6 md:py-6">
-        <h2 class="text-lg md:text-xl font-bold text-gray-900 mb-1">
-          เมนู/สูตรอาหารแนะนำ
-        </h2>
-        <p class="text-xs md:text-sm text-gray-500 mb-3">
-          สรุปเมนูและสูตรอาหารที่ใกล้เคียงในแผน (เฉพาะเมนูที่มีสูตรอาหารในเว็บ)
+      <div class="bg-white rounded-2xl shadow-card ring-1 ring-gray-200 p-5">
+        <h3 class="text-lg font-bold mb-1">เมนู/สูตรอาหารแนะนำ</h3>
+        <p class="text-xs text-gray-500 mb-4">
+          แนะนำสูตร “ใกล้เคียง” จากคำหลักในชื่อเมนูของวันนี้
         </p>
 
         {% if suggested_recipes %}
           <div class="space-y-3">
             {% for r in suggested_recipes %}
               <a href="{% url 'recipes:detail' r.id %}"
-                 class="flex gap-3 items-center px-2 py-2 rounded-2xl hover:bg-gray-50 group transition border border-gray-100">
+                 class="flex items-center gap-3 bg-gray-50 hover:bg-gray-100 rounded-xl px-3 py-2 transition">
                 {% if r.image %}
-                  <img src="{{ r.image.url }}"
-                       alt="{{ r.title }}"
-                       class="h-10 w-10 md:h-12 md:w-12 rounded-xl object-cover flex-shrink-0">
+                  <img src="{{ r.image.url }}" alt="{{ r.title }}"
+                       class="w-12 h-12 rounded-lg object-cover flex-shrink-0">
+                {% else %}
+                  <div class="w-12 h-12 rounded-lg bg-orange-50 text-xs flex items-center justify-center text-orange-700">
+                    สูตรอาหาร
+                  </div>
                 {% endif %}
-                <div class="flex-1">
-                  <div class="text-sm md:text-base font-medium text-gray-900 group-hover:text-orange-600">
+                <div>
+                  <div class="text-sm font-semibold text-gray-900">
                     {{ r.title }}
                   </div>
-                  <div class="text-[11px] md:text-xs text-gray-500 mt-0.5">
-                    {% if r.description %}
-                      {{ r.description|truncatechars:45 }}
-                    {% else %}
-                      ไม่มีคำอธิบาย
-                    {% endif %}
-                  </div>
+                  {% if r.restaurant_name %}
+                    <div class="text-[11px] text-gray-500">
+                      จาก: {{ r.restaurant_name }}
+                    </div>
+                  {% endif %}
                 </div>
               </a>
             {% endfor %}
           </div>
         {% else %}
-          <p class="text-sm text-gray-400 mt-2">
-            ยังไม่มีเมนูแนะนำสำหรับวันนี้ (ลองเพิ่มเมนูที่มีสูตรอาหารในแผนดู)
+          <p class="text-sm text-gray-400">
+            ยังไม่มีสูตรอาหารแนะนำสำหรับเมนูในแผนวันนี้
           </p>
         {% endif %}
       </div>
     </div>
 
   </div>
-
-  <!-- ปุ่มด้านล่าง -->
-  <div class="mt-6 flex flex-wrap justify-center gap-3">
-    <a href="{% url 'budgets:home' %}?start={{ week_start|date:'Y-m-d' }}"
-       class="px-4 py-2.5 rounded-xl border border-gray-300 text-sm md:text-base text-gray-700 hover:bg-gray-50">
-      « กลับตารางสัปดาห์
-    </a>
-    <a href="{% url 'plan:summary' %}"
-       class="px-4 py-2.5 rounded-xl border border-gray-300 text-sm md:text-base text-gray-700 hover:bg-gray-50">
-      ← กลับไปแผนเมนู
-    </a>
-  </div>
-
 </div>
 {% endblock %}

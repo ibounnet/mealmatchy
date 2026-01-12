@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+{% block title %}สรุปการใช้จ่าย 7 วัน{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto">
+
+  <div class="flex items-start justify-between gap-3 mt-6 mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">สรุปการใช้จ่ายจากแผนมื้ออาหาร</h1>
+      <p class="text-sm text-gray-600 mt-1">
+        ช่วงวันที่ {{ start_date|date:"d M Y" }} – {{ end_date|date:"d M Y" }}
+        {% if plan_mode and plan %}
+          <span class="text-gray-400">| แผน: {{ plan.title|default:"(ไม่มีชื่อแผน)" }}</span>
+        {% endif %}
+      </p>
+    </div>
+
+    <div class="flex gap-2">
+      <a href="{% url 'budgets:home' %}"
+         class="px-3 py-2 rounded-xl bg-orange-500 text-white text-sm hover:bg-orange-600">
+        ตารางงบรายวัน
+      </a>
+    </div>
+  </div>
+
+  {% if not plan_mode %}
+    <div class="flex items-center gap-2 mb-4 text-sm">
+      <a class="px-3 py-1.5 rounded-lg ring-1 ring-gray-200 hover:bg-gray-50"
+         href="{% url 'budgets:weekly_summary' %}?start={{ prev_start|date:'Y-m-d' }}">« สัปดาห์ก่อน</a>
+
+      <div class="px-3 py-1.5 font-medium">
+        {{ start_date|date:"Y-m-d" }} – {{ end_date|date:"Y-m-d" }}
+      </div>
+
+      <a class="px-3 py-1.5 rounded-lg ring-1 ring-gray-200 hover:bg-gray-50"
+         href="{% url 'budgets:weekly_summary' %}?start={{ next_start|date:'Y-m-d' }}">สัปดาห์ถัดไป »</a>
+    </div>
+  {% endif %}
+
+  <!-- KPI Cards -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div class="bg-white rounded-2xl ring-1 ring-gray-200 p-4">
+      <div class="text-xs text-gray-500">งบรวมช่วงนี้</div>
+      <div class="text-2xl font-bold mt-1">{{ total_budget }} บาท</div>
+      <div class="text-xs text-gray-400 mt-1">เฉลี่ยต่อวัน: {{ daily_average }} บาท</div>
+    </div>
+
+    <div class="bg-white rounded-2xl ring-1 ring-gray-200 p-4">
+      <div class="text-xs text-gray-500">ค่าใช้จ่ายรวม</div>
+      <div class="text-2xl font-bold mt-1">{{ total_spent }} บาท</div>
+      <div class="text-xs text-gray-400 mt-1">
+        {% if over_amount > 0 %}
+          เกินงบ: {{ over_amount }} บาท
+        {% else %}
+          ไม่เกินงบ
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="bg-white rounded-2xl ring-1 ring-gray-200 p-4">
+      <div class="text-xs text-gray-500">งบคงเหลือ</div>
+      <div class="text-2xl font-bold mt-1 {% if remaining < 0 %}text-red-600{% else %}text-green-600{% endif %}">
+        {{ remaining }} บาท
+      </div>
+      <div class="text-xs text-gray-400 mt-1">
+        {% if under_amount > 0 %}
+          เหลือจากงบ: {{ under_amount }} บาท
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="bg-white rounded-2xl ring-1 ring-gray-200 p-4">
+      <div class="text-xs text-gray-500">MealMatchy Match Score</div>
+      <div class="text-2xl font-bold mt-1">{{ match_score }}/100</div>
+      <div class="text-xs text-gray-400 mt-1">ยิ่งใกล้งบที่ตั้งไว้ ยิ่งคะแนนสูง</div>
+    </div>
+  </div>
+
+  <!-- ตารางรายวัน -->
+  <div class="bg-white rounded-2xl ring-1 ring-gray-200 overflow-x-auto mb-6">
+    <table class="min-w-full text-sm">
+      <thead class="bg-gray-50 text-gray-700">
+        <tr class="text-left">
+          <th class="px-4 py-3">วันที่</th>
+          <th class="px-4 py-3">งบต่อวัน</th>
+          <th class="px-4 py-3">ใช้จริง</th>
+          <th class="px-4 py-3">คงเหลือ / เกิน</th>
+          <th class="px-4 py-3">สถานะ</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+          <tr class="border-t {% if row.is_today %}bg-orange-50{% else %}bg-white{% endif %}">
+            <td class="px-4 py-3">
+              <a href="{% url 'budgets:day_detail' row.date|date:'Y-m-d' %}"
+                 class="font-medium text-gray-900 hover:underline">
+                {{ row.date|date:"D d M" }}
+              </a>
+            </td>
+            <td class="px-4 py-3">{{ row.budget_amount }} บาท</td>
+            <td class="px-4 py-3 {% if row.spent_amount > row.budget_amount %}text-red-600{% else %}text-gray-900{% endif %}">
+              {{ row.spent_amount }} บาท
+            </td>
+            <td class="px-4 py-3">
+              {% if row.remain_amount < 0 %}
+                <span class="text-red-600">{{ row.remain_amount }} บาท</span>
+              {% else %}
+                <span class="text-green-600">+{{ row.remain_amount }} บาท</span>
+              {% endif %}
+            </td>
+            <td class="px-4 py-3">
+              {% if row.status == "over" %}
+                <span class="px-2 py-1 rounded-full text-xs bg-red-50 text-red-700 ring-1 ring-red-200">เกินงบ</span>
+              {% elif row.status == "equal" %}
+                <span class="px-2 py-1 rounded-full text-xs bg-gray-50 text-gray-700 ring-1 ring-gray-200">พอดีงบ</span>
+              {% elif row.status == "under" %}
+                <span class="px-2 py-1 rounded-full text-xs bg-green-50 text-green-700 ring-1 ring-green-200">ประหยัดกว่างบ</span>
+              {% elif row.status == "no_budget" %}
+                <span class="px-2 py-1 rounded-full text-xs bg-yellow-50 text-yellow-800 ring-1 ring-yellow-200">ไม่มีงบ แต่มีใช้</span>
+              {% else %}
+                <span class="px-2 py-1 rounded-full text-xs bg-gray-50 text-gray-500 ring-1 ring-gray-200">ไม่มีข้อมูล</span>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- สรุปมื้อ + เมนูเด่น -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-10">
+    <div class="bg-white rounded-2xl ring-1 ring-gray-200 p-4">
+      <div class="text-xs text-gray-500">จำนวนมื้ออาหารทั้งหมดในช่วงนี้</div>
+      <div class="text-2xl font-bold mt-1">{{ total_meals }} มื้อ</div>
+      <div class="text-xs text-gray-400 mt-2">นับจากรายการที่ note เป็น มื้อเช้า/เที่ยง/เย็น</div>
+
+      {% if meals_by_type %}
+        <div class="mt-3 space-y-1 text-sm">
+          {% for m in meals_by_type %}
+            <div class="flex justify-between">
+              <span>{{ m.label }}</span>
+              <span class="font-semibold">{{ m.total }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="text-sm text-gray-400 mt-3">ยังไม่มีข้อมูลมื้ออาหาร</div>
+      {% endif %}
+    </div>
+
+    <div class="bg-white rounded-2xl ring-1 ring-gray-200 p-4">
+      <div class="text-sm font-semibold text-gray-900">เมนูที่ใช้จ่ายสูงสุด</div>
+      {% if expensive_menus %}
+        <ul class="mt-3 space-y-1 text-sm text-gray-700">
+          {% for x in expensive_menus %}
+            <li class="flex justify-between">
+              <span>{{ x.name }}</span>
+              <span class="font-semibold">{{ x.total }} บาท</span>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <div class="text-sm text-gray-400 mt-3">ยังไม่มีเมนูในช่วงนี้</div>
+      {% endif %}
+    </div>
+
+    <div class="bg-white rounded-2xl ring-1 ring-gray-200 p-4">
+      <div class="text-sm font-semibold text-gray-900">เมนูที่ประหยัดที่สุด</div>
+      {% if cheap_menus %}
+        <ul class="mt-3 space-y-1 text-sm text-gray-700">
+          {% for x in cheap_menus %}
+            <li class="flex justify-between">
+              <span>{{ x.name }}</span>
+              <span class="font-semibold">{{ x.total }} บาท</span>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <div class="text-sm text-gray-400 mt-3">ยังไม่มีเมนูในช่วงนี้</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="text-xs text-gray-400">
+    ข้อมูลหน้านี้อิงจาก DailyBudget (งบรายวัน) และ BudgetSpend (รายการใช้จ่าย) ภายในช่วงวันที่ที่เลือกเท่านั้น
+  </div>
+
+</div>
+{% endblock %}

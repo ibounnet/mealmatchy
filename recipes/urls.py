@@ -1,17 +1,20 @@
-# recipes/urls.py
 from django.urls import path
+
+from recipes import api
 from . import views
 
 app_name = "recipes"
 
 urlpatterns = [
-
-    path("mine/", views.my_recipe_list, name="mine"),  # สูตรของฉัน
-
     path("", views.recipe_list, name="list"),
-    path("<int:pk>/", views.recipe_detail, name="detail"),
     path("add/", views.add_recipe, name="add"),
+    path("<int:pk>/", views.recipe_detail, name="detail"),
     path("<int:pk>/edit/", views.edit_recipe, name="edit"),
-    path("<int:pk>/delete/", views.delete_recipe, name="delete"),  # ปุ่มลบ
+    path("<int:pk>/delete/", views.delete_recipe, name="delete"),
+
+    path("cost-settings/", views.cost_settings, name="cost_settings"),
+
+    # API: ingredient price per gram
+    path("api/ingredient/<int:pk>/", api.ingredient_detail, name="ingredient_detail"),
+    path("api/ingredient/create/", api.ingredient_create, name="ingredient_create"),
 ]
-   

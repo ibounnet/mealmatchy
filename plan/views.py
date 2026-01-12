@@ -1,11 +1,12 @@
 from __future__ import annotations
+
 from datetime import date, timedelta
 from typing import List, Tuple
 import json, random
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import redirect, render
+from django.shortcuts import redirect, render, get_object_or_404
 from django.views.decorators.http import require_POST
 from django.utils import timezone
 
@@ -26,9 +27,71 @@ def _parse_date(s: str | None) -> date:
     if not s:
         return timezone.localdate()
     try:
-        return date.fromisoformat(s)
+        return date.fromisoformat(str(s))
     except Exception:
         return timezone.localdate()
+
+
+def _plan_end_date(start: date, days: int) -> date:
+    """วันสุดท้ายของแผน (inclusive)"""
+    if not start:
+        start = timezone.localdate()
+    if not days or days <= 0:
+        days = 1
+    return start + timedelta(days=days - 1)
+
+
+def _daily_budget(total_budget: int, days: int) -> float:
+    if not days or days <= 0:
+        days = 1
+    if not total_budget or total_budget <= 0:
+        return 0.0
+    return round(total_budget / days, 2)
+
+
+def _menu_date_from_payload(start_date: date, payload: dict) -> date:
+    """
+    รองรับ 3 แบบ:
+      1) payload['date'] = 'YYYY-MM-DD'
+      2) payload['day_offset'] = 0..6
+      3) ไม่มี -> fallback = start_date
+    """
+    d = payload.get("date")
+    if d:
+        try:
+            return date.fromisoformat(str(d))
+        except Exception:
+            pass
+
+    if payload.get("day_offset") is not None:
+        try:
+            off = int(payload["day_offset"])
+            if off < 0:
+                off = 0
+            return start_date + timedelta(days=off)
+        except Exception:
+            pass
+
+    return start_date
+
+
+def _ensure_session_plan(request):
+    """
+    กัน KeyError / session หาย:
+    ให้มี request.session['plan'] เสมอ
+    """
+    if "plan" not in request.session or not isinstance(request.session.get("plan"), dict):
+        request.session["plan"] = {
+            "days": 7,
+            "budget": 50,
+            "start_date": timezone.localdate().isoformat(),
+            "allergies": [],
+            "dislikes": [],
+            "religions": [],
+            "extra": {},
+        }
+        request.session.modified = True
+    return request.session["plan"]
 
 
 # ----------------- views -----------------
@@ -36,74 +99,74 @@ def _parse_date(s: str | None) -> date:
 def plan_start(request):
     """
     เริ่มวางแผนจาก popup (หน้าแรก)
-
-    ทุกครั้งที่ผู้ใช้เริ่มแผนใหม่:
-    - reset ตัวเลือกเมนูเก่าและ active_plan_id ทิ้ง
+    - reset selected_menus
+    - reset active_plan_id
     """
-    if request.method == 'POST':
-        days = _parse_int(request.POST.get('days', '1'), 1)
-        budget = _parse_int(request.POST.get('budget', '50'), 50)
-        start_date = _parse_date(request.POST.get('start_date', ''))
+    if request.method == "POST":
+        days = _parse_int(request.POST.get("days") or "7", 7)
+        if days not in (1, 7):
+            days = 7
 
-        old = request.session.get('plan', {})
+        budget = _parse_int(request.POST.get("budget", "50"), 50)
+        start_date = _parse_date(request.POST.get("start_date", ""))
 
-        request.session['plan'] = {
-            'days': days,
-            'budget': budget,
-            'start_date': start_date.isoformat(),
-            'allergies': old.get('allergies', []),
-            'dislikes':  old.get('dislikes',  []),
-            'religions': old.get('religions', []),
-            'extra': old.get('extra', {}),
+        old = request.session.get("plan", {}) or {}
+
+        request.session["plan"] = {
+            "days": days,
+            "budget": budget,  # งบรวมทั้งช่วง
+            "start_date": start_date.isoformat(),
+            "allergies": old.get("allergies", []),
+            "dislikes": old.get("dislikes", []),
+            "religions": old.get("religions", []),
+            "extra": old.get("extra", {}),
         }
 
-        request.session.pop('selected_menus', None)
-        request.session.pop('active_plan_id', None)
+        request.session.pop("selected_menus", None)
+        request.session.pop("active_plan_id", None)
         request.session.modified = True
+        return redirect("plan:diet")
 
-        return redirect('plan:diet')
-
-    # ถ้าเป็น GET ก็ถือว่าเริ่มใหม่เหมือนกัน
-    request.session.pop('selected_menus', None)
-    request.session.pop('active_plan_id', None)
+    # GET ก็ถือว่าเริ่มใหม่ (กันค้าง)
+    request.session.pop("selected_menus", None)
+    request.session.pop("active_plan_id", None)
     request.session.modified = True
-    return redirect('plan:diet')
+    return redirect("plan:diet")
 
 
 @login_required
 def plan_diet(request):
     """หน้าเลือกข้อจำกัดอาหาร"""
-    plan = request.session.get('plan', {
-        'days': 1, 'budget': 50, 'start_date': timezone.localdate().isoformat()
-    })
+    plan = _ensure_session_plan(request)
 
     allergy_choices  = ["กุ้ง", "นม", "แป้งสาลี", "ไข่", "ถั่ว", "ทะเล"]
     dislike_choices  = ["หมู", "ไก่", "เห็ด", "หัวหอม", "เครื่องใน", "ผักชี", "กระเทียม", "เนื้อวัว"]
     religion_choices = ["ฮาลาล", "มังสวิรัติ", "อาหารเจ", "หลีกเลี่ยงแอลกอฮอล์"]
 
-    if request.method == 'POST':
-        allergies = request.POST.getlist('allergies')
-        dislikes  = request.POST.getlist('dislikes')
-        religions = request.POST.getlist('religions')
+    if request.method == "POST":
+        allergies = request.POST.getlist("allergies")
+        dislikes  = request.POST.getlist("dislikes")
+        religions = request.POST.getlist("religions")
 
-        request.session['plan'].update({
-            'allergies': allergies,
-            'dislikes': dislikes,
-            'religions': religions,
-            'extra': {
-                'allergy': request.POST.get('extra_allergy', '').strip(),
-                'dislike': request.POST.get('extra_dislike', '').strip(),
-                'religion': request.POST.get('extra_religion', '').strip(),
+        plan.update({
+            "allergies": allergies,
+            "dislikes": dislikes,
+            "religions": religions,
+            "extra": {
+                "allergy": request.POST.get("extra_allergy", "").strip(),
+                "dislike": request.POST.get("extra_dislike", "").strip(),
+                "religion": request.POST.get("extra_religion", "").strip(),
             }
         })
+        request.session["plan"] = plan
         request.session.modified = True
-        return redirect('plan:summary')
+        return redirect("plan:summary")
 
-    return render(request, 'plan/plan_diet.html', {
-        'plan': plan,
-        'allergy_choices': allergy_choices,
-        'dislike_choices': dislike_choices,
-        'religion_choices': religion_choices,
+    return render(request, "plan/plan_diet.html", {
+        "plan": plan,
+        "allergy_choices": allergy_choices,
+        "dislike_choices": dislike_choices,
+        "religion_choices": religion_choices,
     })
 
 
@@ -111,15 +174,23 @@ def plan_diet(request):
 def mealplan_summary(request):
     """
     หน้าสรุปแผน:
-    - สุ่มร้าน -> ดึงเมนูของร้าน
-    - ใช้ selected_menus จาก session เป็นค่าเริ่มต้น (ค้างเมนูเดิมไว้)
+    - budget ใน session = งบรวมทั้งช่วง (1 หรือ 7 วัน)
+    - daily_budget = budget / days
+    - ส่ง start_date + days ไปให้ JS ใช้สร้าง dropdown วันในแผนแบบชัวร์
     """
-    plan = request.session.get('plan')
+    plan = request.session.get("plan")
     if not plan:
-        messages.info(request, "กรุณาเริ่มวางแผนก่อน")
-        return redirect('plan:start')
+        plan = _ensure_session_plan(request)
 
-    budget = _parse_int(plan.get('budget', 0), 0)
+    days = _parse_int(plan.get("days", 7), 7)
+    if days not in (1, 7):
+        days = 7
+
+    total_budget = _parse_int(plan.get("budget", 0), 0)
+    daily_budget = _daily_budget(total_budget, days)
+
+    start_date = _parse_date(plan.get("start_date"))
+    end_inclusive = _plan_end_date(start_date, days)
 
     # สุ่มร้าน 3 ร้าน
     all_ids = list(Restaurant.objects.values_list("id", flat=True))
@@ -127,15 +198,25 @@ def mealplan_summary(request):
     restaurants = Restaurant.objects.filter(id__in=picked_ids)
 
     data: List[Tuple[Restaurant, List[Menu]]] = []
-    for r in restaurants:
-        menus = Menu.objects.filter(restaurant=r)
-        menus = filter_by_plan(menus, plan)
-        if budget > 0:
-            menus = menus.filter(price__lte=budget)
-        data.append((r, list(menus)))
+    price_limit = daily_budget if daily_budget > 0 else None
 
-    # อ่านเมนูที่เลือกค้างไว้จาก session
+    for r in restaurants:
+        menus_qs = Menu.objects.filter(restaurant=r)
+        menus_qs = filter_by_plan(menus_qs, plan)
+        if price_limit:
+            menus_qs = menus_qs.filter(price__lte=price_limit)
+        data.append((r, list(menus_qs)))
+
     selected_menus = request.session.get("selected_menus", [])
+
+    used_amount = 0.0
+    for m in selected_menus:
+        try:
+            used_amount += float(m.get("price", 0) or 0)
+        except Exception:
+            pass
+
+    remaining_budget = float(total_budget) - used_amount
 
     return render(request, "plan/summary.html", {
         "plan": plan,
@@ -143,6 +224,16 @@ def mealplan_summary(request):
         "meal_choices": ["มื้อเช้า", "มื้อเที่ยง", "มื้อเย็น"],
         "today": timezone.localdate(),
         "selected_menus_json": json.dumps(selected_menus, ensure_ascii=False),
+
+        "total_budget": total_budget,
+        "daily_budget": daily_budget,
+        "used_amount": round(used_amount, 2),
+        "remaining_budget": round(remaining_budget, 2),
+
+        # สำคัญ: ส่งให้ dropdown วันในแผนใช้
+        "plan_start_date": start_date.isoformat(),
+        "plan_days": days,
+        "plan_end_date": end_inclusive.isoformat(),
     })
 
 
@@ -150,29 +241,58 @@ def mealplan_summary(request):
 @require_POST
 def save_plan(request):
     """
-    รับ selections จาก summary (JSON: [{id, name, price, meal, ...}, ...])
-
-    ปรับ logic ใหม่:
-    - มองว่าเป็น "แผนต่อวัน" ถ้าบันทึกซ้ำในช่วงวันที่เดิม
-      ให้ลบแผนเก่า + รายการใช้จ่ายเก่าของช่วงนั้นทิ้งก่อน แล้วค่อยสร้างใหม่
-      ทำให้ยอด 'ใช้ไป' ไม่เพิ่มซ้ำทุกครั้งที่กดบันทึก
+    บันทึกแผนมื้ออาหารจากหน้า summary
+    - ล็อกตามงบเฉลี่ยต่อวัน (daily_budget)
+    - ถ้าวันไหนเกิน daily_budget -> ไม่ให้บันทึกแผน
     """
+
+    # 1) ดึงเมนูที่เลือก
     try:
         menus = json.loads(request.POST.get("menus", "[]"))
     except json.JSONDecodeError:
         menus = []
 
     if not menus:
-        messages.error(request, "กรุณาเลือกเมนูก่อนบันทึก")
+        messages.error(request, "กรุณาเลือกเมนูก่อนบันทึกแผน")
         return redirect("plan:summary")
 
+    # 2) ดึงแผนจาก session
     sess = request.session.get("plan") or {}
     start_date = _parse_date(sess.get("start_date"))
-    days = _parse_int(sess.get("days", 1), 1)
-    budget = _parse_int(sess.get("budget", 0), 0)
-    end_date = start_date + timedelta(days=days)
+    days = _parse_int(sess.get("days", 7), 7)
+    if days not in (1, 7):
+        days = 7
 
-    # 1) ลบแผนเก่า + รายการใช้งบเก่าของช่วงวันเดียวกัน (เฉพาะที่มาจากแผน)
+    total_budget = _parse_int(sess.get("budget", 0), 0)
+    daily_budget = _daily_budget(total_budget, days)
+    end_date_inclusive = _plan_end_date(start_date, days)
+
+    # 3) ✅ VALIDATE: รวมเงินต่อวันห้ามเกิน daily_budget
+    # ถ้า daily_budget = 0 ให้ผ่าน (เผื่อบางเคสยังไม่กรอกงบ)
+    if daily_budget > 0:
+        sums = {}  # {date: float}
+        for m in menus:
+            menu_id = m.get("id")
+            menu = Menu.objects.filter(pk=menu_id).first()
+            if not menu:
+                continue
+
+            spend_date = _menu_date_from_payload(start_date, m)
+            if spend_date < start_date:
+                spend_date = start_date
+            if spend_date > end_date_inclusive:
+                spend_date = end_date_inclusive
+
+            key = spend_date.isoformat()
+            sums[key] = (sums.get(key, 0.0) + float(menu.price or 0))
+
+        for d, total in sums.items():
+            if total > daily_budget:
+                over = round(total - daily_budget, 2)
+                messages.error(request, f"บันทึกแผนไม่ได้: วันที่ {d} เกินงบเฉลี่ยต่อวัน {over} บาท")
+                return redirect("plan:summary")
+
+    # 4) ลบแผนเก่า (กันซ้ำ)
     old_plans = MealPlan.objects.filter(
         user=request.user,
         start_date=start_date,
@@ -184,55 +304,99 @@ def save_plan(request):
             user=request.user,
             plan__in=old_plans,
             date__gte=start_date,
-            date__lt=end_date,
+            date__lte=end_date_inclusive,
         ).delete()
 
         DailyBudget.objects.filter(
             user=request.user,
             plan__in=old_plans,
             date__gte=start_date,
-            date__lt=end_date,
+            date__lte=end_date_inclusive,
         ).delete()
 
         old_plans.delete()
 
-    # 2) สร้างแผนใหม่
+    # 5) สร้าง MealPlan
     plan_obj = MealPlan.objects.create(
         user=request.user,
         start_date=start_date,
         days=days,
-        budget_per_day=budget,
-        title=sess.get("title", ""),
+        budget_per_day=daily_budget,
+        title=sess.get("title", "") or "",
     )
 
-    request.session["active_plan_id"] = plan_obj.id
-    request.session["selected_menus"] = menus  # เก็บไว้ให้ค้างเมนูตอนกลับมาดู
-    request.session.modified = True
-
-    # 3) สร้าง DailyBudget สำหรับแต่ละวัน (ใช้ update_or_create เผื่อเคยมีบันทึก)
+    # 6) สร้าง DailyBudget ครบทุกวัน
     for i in range(days):
         d = start_date + timedelta(days=i)
         DailyBudget.objects.update_or_create(
             user=request.user,
             date=d,
             plan=plan_obj,
-            defaults={"amount": budget},
+            defaults={"amount": daily_budget},
         )
 
-    # 4) บันทึก BudgetSpend ของเมนูที่เลือก (ตอนนี้จะมีชุดเดียว ไม่ซ้ำกับของเดิมแล้ว)
+    # 7) บันทึก BudgetSpend ตามวันจริง
     for m in menus:
-        menu = Menu.objects.filter(pk=m.get("id")).first()
+        menu_id = m.get("id")
+        menu = Menu.objects.filter(pk=menu_id).first()
         if not menu:
             continue
 
+        spend_date = _menu_date_from_payload(start_date, m)
+        if spend_date < start_date:
+            spend_date = start_date
+        if spend_date > end_date_inclusive:
+            spend_date = end_date_inclusive
+
+        meal_label = (m.get("meal") or "").strip()
         BudgetSpend.objects.create(
             user=request.user,
-            date=start_date,        # ถ้าต่อไปอยากแยกเป็นวัน-มื้อ ค่อยกระจายวันที่ทีหลัง
+            date=spend_date,
             amount=menu.price,
             menu=menu,
             plan=plan_obj,
-            note=(m.get("meal") or ""),
+            note=meal_label,
         )
 
+    # 8) อัปเดต session
+    sess["daily_budget"] = daily_budget
+    request.session["plan"] = sess
+    request.session["active_plan_id"] = plan_obj.id
+    request.session["selected_menus"] = menus
+    request.session.modified = True
+
     messages.success(request, "บันทึกแผนเรียบร้อยแล้ว")
-    return redirect("/budget/?from_plan=1")
+    return redirect("budgets:home")
+
+
+
+# ----------------- NEW: list plans -----------------
+@login_required
+def my_plans(request):
+    active_id = request.session.get("active_plan_id")
+    plans = MealPlan.objects.filter(user=request.user).order_by("-created_at")
+
+    today = timezone.localdate()
+    items = []
+
+    for p in plans:
+        start = p.start_date
+        end_inclusive = _plan_end_date(p.start_date, p.days)
+        items.append({
+            "plan": p,
+            "start": start,
+            "end": end_inclusive,
+            "is_active": (active_id == p.id),
+            "in_range": (start <= today <= end_inclusive),
+        })
+
+    return render(request, "plan/my_plans.html", {"items": items})
+
+
+@login_required
+def use_plan(request, plan_id: int):
+    plan = get_object_or_404(MealPlan, id=plan_id, user=request.user)
+    request.session["active_plan_id"] = plan.id
+    request.session.modified = True
+    messages.success(request, f"ตั้งค่าใช้งานแผนเริ่ม {plan.start_date} แล้ว")
+    return redirect("plan:my_plans")

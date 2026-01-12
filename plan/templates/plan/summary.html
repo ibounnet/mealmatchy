@@ -24,6 +24,7 @@
                 <div class="font-semibold text-gray-900 text-base">{{ m.name }}</div>
                 <div class="text-sm text-gray-700 font-medium">ราคา: {{ m.price }} บาท</div>
 
+                <!-- เลือกมื้อ -->
                 <select class="meal-select border rounded-lg px-2 py-1 text-sm w-full"
                         data-id="{{ m.id }}">
                   <option value="" disabled selected hidden>เลือกมื้อ</option>
@@ -55,14 +56,35 @@
   <div class="mt-4 lg:mt-10">
     <div class="bg-white shadow-md rounded-2xl ring-1 ring-gray-200 p-5">
       <h3 class="text-lg font-bold text-gray-800 mb-3">สรุปงบประมาณ</h3>
-      <p class="text-sm text-gray-700 mb-1">งบต่อวัน:
-        <span class="font-bold text-red-600">{{ plan.budget }} บาท</span>
+
+      <!-- เลือกวันในแผน -->
+      <div class="mb-3">
+        <label class="block text-sm text-gray-600 mb-1">เลือกวันในแผน</label>
+        <select id="day-select"
+                class="w-full rounded-xl ring-1 ring-gray-200 px-3 py-2 text-sm bg-white">
+        </select>
+      </div>
+
+      <p class="text-sm text-gray-700">
+        งบทั้งสัปดาห์:
+        <span class="font-bold text-orange-600">{{ total_budget }} บาท</span>
       </p>
-      <p class="text-sm text-gray-700 mb-3">งบที่เหลือ:
-        <span id="remain-budget" class="font-bold text-red-600">{{ plan.budget }}</span> บาท
+      <p class="text-sm text-gray-700">
+        งบเฉลี่ยต่อวัน:
+        <span class="font-bold text-gray-900">{{ daily_budget }} บาท</span>
       </p>
 
-      <div id="selected-list" class="space-y-4">
+      <!-- ✅ สรุปแบบอิง "วันในแผน" -->
+      <p class="text-sm text-gray-700 mt-2">
+        ใช้ไปแล้ว (วันนั้น):
+        <span id="used-day-text" class="font-bold text-gray-900">0 บาท</span>
+      </p>
+      <p class="text-sm text-gray-700 mb-3">
+        งบที่เหลือ (วันนั้น):
+        <span id="remain-day-text" class="font-bold text-green-600">0 บาท</span>
+      </p>
+
+      <div id="selected-list" class="space-y-3 mb-3">
         <p class="text-gray-400">ยังไม่ได้เลือกเมนู</p>
       </div>
 
@@ -84,21 +106,84 @@
 document.addEventListener("DOMContentLoaded", () => {
   const buttons    = document.querySelectorAll(".select-btn");
   const listEl     = document.getElementById("selected-list");
-  const remainEl   = document.getElementById("remain-budget");
   const menusInput = document.getElementById("menus-input");
   const saveBtn    = document.getElementById("save-btn");
   const errorMsg   = document.getElementById("error-msg");
-  const budget     = parseInt("{{ plan.budget }}");
 
-  // อ่านค่าที่ค้างไว้จาก session (django ใส่มาให้เป็น JSON string)
+  const daySelect  = document.getElementById("day-select");
+  const usedDayEl  = document.getElementById("used-day-text");
+  const remainDayEl= document.getElementById("remain-day-text");
+
+  const DAILY_BUDGET = Number("{{ daily_budget|default:0 }}") || 0;
+
+  const PLAN_START = "{{ plan_start_date|escapejs }}";   // YYYY-MM-DD
+  const PLAN_DAYS  = Number("{{ plan_days|default:7 }}") || 7;
+
+  function pad2(n){ return String(n).padStart(2,'0'); }
+  function toISO(d){
+    const y = d.getFullYear();
+    const m = pad2(d.getMonth() + 1);
+    const da = pad2(d.getDate());
+    return `${y}-${m}-${da}`;
+  }
+  function safeDateFromISO(iso){
+    if (!iso || typeof iso !== "string") return null;
+    const parts = iso.split("-");
+    if (parts.length !== 3) return null;
+    const y = Number(parts[0]), m = Number(parts[1]), d = Number(parts[2]);
+    if (!y || !m || !d) return null;
+    const dt = new Date(y, m - 1, d);
+    if (isNaN(dt.getTime())) return null;
+    return dt;
+  }
+
+  // ---- เติม dropdown วันในแผน ----
+  const startDt = safeDateFromISO(PLAN_START) || new Date();
+  daySelect.innerHTML = "";
+  for (let i = 0; i < PLAN_DAYS; i++) {
+    const dt = new Date(startDt.getFullYear(), startDt.getMonth(), startDt.getDate() + i);
+    const iso = toISO(dt);
+
+    const opt = document.createElement("option");
+    opt.value = String(i);       // day_offset
+    opt.dataset.date = iso;      // date จริง
+    opt.textContent = iso;
+    daySelect.appendChild(opt);
+  }
+
+  // ---- โหลด selected ที่ค้าง ----
   let selectedMenus = [];
   try {
     selectedMenus = JSON.parse('{{ selected_menus_json|default:"[]"|escapejs }}');
+    if (!Array.isArray(selectedMenus)) selectedMenus = [];
   } catch (e) {
     selectedMenus = [];
   }
 
-  // helper: อัปเดตปุ่มฝั่งซ้ายให้ตรงกับ selectedMenus
+  function sumByDate() {
+    // map: { "YYYY-MM-DD": number }
+    const map = {};
+    selectedMenus.forEach(m => {
+      const d = String(m.date || "");
+      const p = Number(m.price || 0);
+      if (!d) return;
+      map[d] = (map[d] || 0) + p;
+    });
+    return map;
+  }
+
+  function anyDayOverBudget() {
+    if (DAILY_BUDGET <= 0) return { over: false, msg: "" }; // ถ้า daily_budget=0 ไม่ล็อก
+    const map = sumByDate();
+    for (const d in map) {
+      if (map[d] > DAILY_BUDGET) {
+        const over = map[d] - DAILY_BUDGET;
+        return { over: true, msg: `วันที่ ${d} เกินงบเฉลี่ยต่อวัน ${over.toFixed(2)} บาท` };
+      }
+    }
+    return { over: false, msg: "" };
+  }
+
   function syncLeftButtons() {
     buttons.forEach(btn => {
       const id = String(btn.dataset.id);
@@ -116,25 +201,33 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function render() {
-    listEl.innerHTML = "";
-    let remain = budget;
+    const selectedOpt = daySelect.options[daySelect.selectedIndex];
+    const activeDate = selectedOpt ? selectedOpt.dataset.date : "";
 
-    if (selectedMenus.length === 0) {
-      listEl.innerHTML = "<p class='text-gray-400'>ยังไม่ได้เลือกเมนู</p>";
+    // แสดงเฉพาะเมนูของวันที่เลือก
+    const todayMenus = activeDate
+      ? selectedMenus.filter(m => String(m.date) === activeDate)
+      : selectedMenus;
+
+    listEl.innerHTML = "";
+    if (todayMenus.length === 0) {
+      listEl.innerHTML = "<p class='text-gray-400'>วันนี้ยังไม่ได้เลือกเมนู</p>";
     } else {
-      selectedMenus.forEach((m, index) => {
-        remain -= m.price;
+      todayMenus.forEach((m, index) => {
+        // index ต้องอิง selectedMenus จริงเพื่อให้ลบถูกตัว
+        const realIndex = selectedMenus.findIndex(x => String(x.id) === String(m.id));
+
         const card = document.createElement("div");
-        card.className = "bg-white shadow-sm rounded-xl overflow-hidden ring-1 ring-gray-200 p-3 flex justify-between items-center";
+        card.className = "bg-white shadow-sm rounded-xl ring-1 ring-gray-200 p-3 flex justify-between items-center";
         card.innerHTML = `
-          <div>
-            <div class="font-bold text-gray-900">${m.meal} | ${m.name}</div>
-            <div class="text-sm text-gray-700">ร้าน: ${m.restaurant}</div>
-            <div class="text-sm text-orange-600 font-semibold">${m.price} บาท</div>
+          <div class="min-w-0">
+            <div class="font-bold text-gray-900 truncate">${m.date} • ${m.meal} • ${m.name}</div>
+            <div class="text-sm text-gray-700 truncate">ร้าน: ${m.restaurant || "-"}</div>
+            <div class="text-sm text-orange-600 font-semibold">${Number(m.price||0)} บาท</div>
           </div>
           <button type="button"
                   class="remove-btn text-xs px-2 py-1 rounded-lg bg-red-100 text-red-600 hover:bg-red-200"
-                  data-index="${index}">
+                  data-index="${realIndex}">
             ลบ
           </button>
         `;
@@ -142,75 +235,84 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
 
-    remainEl.textContent = remain;
+    // คำนวณ used/remain ของ "วันนั้น"
+    const map = sumByDate();
+    const usedDay = activeDate ? (map[activeDate] || 0) : 0;
+    const remainDay = DAILY_BUDGET - usedDay;
+
+    usedDayEl.textContent = `${usedDay.toFixed(2)} บาท`;
+    remainDayEl.textContent = `${remainDay.toFixed(2)} บาท`;
+    remainDayEl.classList.toggle("text-red-600", remainDay < 0);
+    remainDayEl.classList.toggle("text-green-600", remainDay >= 0);
+
+    // ส่ง payload ทั้งหมด
     menusInput.value = JSON.stringify(selectedMenus);
 
-    if (remain < 0) {
+    // ✅ disable save ถ้าวันไหนในทั้งแผนเกินงบเฉลี่ย
+    const chk = anyDayOverBudget();
+    if (chk.over) {
       saveBtn.disabled = true;
-      errorMsg.textContent = `คุณใช้เกินงบ ${Math.abs(remain)} บาท`;
+      errorMsg.textContent = chk.msg;
       errorMsg.classList.remove("hidden");
     } else {
       saveBtn.disabled = false;
       errorMsg.classList.add("hidden");
     }
 
-    // ติด event ให้ปุ่มลบทุกอัน
+    // bind remove
     listEl.querySelectorAll(".remove-btn").forEach(btn => {
       btn.addEventListener("click", () => {
-        const idx = parseInt(btn.dataset.index);
-        const removed = selectedMenus[idx];
-        selectedMenus.splice(idx, 1);
-
-        // รีเซ็ตปุ่มฝั่งซ้ายของเมนูที่ถูกลบ
-        if (removed) {
-          const leftBtn = document.querySelector(`.select-btn[data-id="${removed.id}"]`);
-          if (leftBtn) {
-            leftBtn.textContent = "เลือกเมนู";
-            leftBtn.classList.remove("bg-green-600");
-            leftBtn.classList.add("bg-orange-500");
-          }
-        }
-
+        const idx = Number(btn.dataset.index);
+        if (idx >= 0) selectedMenus.splice(idx, 1);
         render();
+        syncLeftButtons();
       });
     });
   }
 
-  // คลิกเลือกเมนูฝั่งซ้าย
+  // ---- เลือกเมนู ----
   buttons.forEach(btn => {
     btn.addEventListener("click", () => {
       const id = String(btn.dataset.id);
+
       const mealSelect = document.querySelector(`.meal-select[data-id="${id}"]`);
       const meal = mealSelect ? mealSelect.value : "";
-
       if (!meal) {
         alert("กรุณาเลือกมื้อก่อน");
+        return;
+      }
+
+      const selectedOpt = daySelect.options[daySelect.selectedIndex];
+      const dayOffset = Number(daySelect.value);
+      const selectedDate = selectedOpt ? selectedOpt.dataset.date : "";
+      if (!selectedDate) {
+        alert("กรุณาเลือกวันในแผนก่อน");
         return;
       }
 
       const menu = {
         id: id,
         name: btn.dataset.name,
-        price: parseInt(btn.dataset.price),
-        image: btn.dataset.image,
-        restaurant: btn.dataset.restaurant,
-        meal: meal
+        price: Number(btn.dataset.price || 0),
+        image: btn.dataset.image || "",
+        restaurant: btn.dataset.restaurant || "",
+        meal: meal,
+        day_offset: dayOffset,
+        date: selectedDate,
       };
 
-      // ไม่อนุญาตให้เมนูเดียวกันอยู่มากกว่า 1 ครั้ง (จะถือว่ามีได้แค่มื้อเดียว)
+      // toggle
       const idx = selectedMenus.findIndex(m => String(m.id) === id);
-      if (idx >= 0) {
-        selectedMenus.splice(idx, 1);
-      } else {
-        selectedMenus.push(menu);
-      }
+      if (idx >= 0) selectedMenus.splice(idx, 1);
+      else selectedMenus.push(menu);
 
       render();
       syncLeftButtons();
     });
   });
 
-  // render ครั้งแรกจาก session
+  daySelect.addEventListener("change", render);
+
   render();
   syncLeftButtons();
 });

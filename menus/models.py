@@ -13,6 +13,12 @@ class Ingredient(models.Model):
     """เก็บวัตถุดิบ เช่น กุ้ง, หมู, ไข่, นม"""
     name = models.CharField(max_length=100, unique=True)
 
+    source = models.CharField(max_length=50, default="lotus")  # lotus/custom
+    price = models.DecimalField(max_digits=10, decimal_places=2, default=0)          # ราคา/แพ็ค หรือ ราคา/กก.
+    size_grams = models.DecimalField(max_digits=10, decimal_places=2, default=0)     # ปริมาณเป็นกรัม (เช่น 1000)
+    price_per_gram = models.DecimalField(max_digits=10, decimal_places=4, default=0) # บาท/กรัม
+    last_updated = models.DateTimeField(auto_now=True)
+    
     def __str__(self):
         return self.name
 
@@ -58,3 +64,4 @@ class Menu(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.restaurant_name or self.restaurant})"
+

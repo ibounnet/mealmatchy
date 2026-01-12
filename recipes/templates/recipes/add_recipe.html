@@ -1,127 +1,646 @@
-{# recipes/templates/recipes/add_recipe.html #}
 {% extends "base.html" %}
-{% load static %}
-
-{% block title %}{{ title }}{% endblock %}
+{% block title %}{{ title|default:"เพิ่มสูตรอาหาร" }}{% endblock %}
 
 {% block content %}
-<div class="max-w-3xl mx-auto py-8">
+<div class="max-w-5xl mx-auto px-4 py-8">
+  <h1 class="text-2xl font-bold text-gray-900 mb-6">{{ title|default:"เพิ่มสูตรอาหาร" }}</h1>
 
-  {# แสดงข้อความแจ้งเตือนจาก messages #}
   {% if messages %}
-    <div class="space-y-2 mb-6">
+    <div class="space-y-2 mb-4">
       {% for message in messages %}
-        <div class="px-4 py-3 rounded-xl
-          {% if message.tags == 'success' %} bg-green-50 text-green-700
-          {% elif message.tags == 'error' %} bg-red-50 text-red-700
-          {% else %} bg-gray-100 text-gray-700 {% endif %}">
+        <div class="px-4 py-2 rounded-xl text-sm
+          {% if message.tags == 'success' %}bg-green-50 text-green-700
+          {% elif message.tags == 'error' %}bg-red-50 text-red-700
+          {% else %}bg-gray-50 text-gray-700{% endif %}">
           {{ message }}
         </div>
       {% endfor %}
     </div>
   {% endif %}
 
-  <div class="flex items-center justify-between mb-6">
-    <h1 class="text-3xl font-bold">{{ title }}</h1>
-    <a href="{% url 'recipes:list' %}"
-       class="px-4 py-2 rounded-xl ring-1 ring-gray-200 text-sm hover:bg-gray-50">
-      กลับไปหน้ารวมสูตร
-    </a>
-  </div>
-
-  <form method="post" enctype="multipart/form-data"
-        class="bg-white p-6 rounded-2xl shadow-card border border-gray-100 space-y-5">
+  <form method="post" enctype="multipart/form-data" class="space-y-6">
     {% csrf_token %}
-    {{ form.non_field_errors }}
 
-    <div>
-      <label class="block text-sm font-medium mb-1">ชื่อเมนู / ชื่อสูตรอาหาร</label>
-      {{ form.title }}
-      {% for e in form.title.errors %}
-        <p class="text-red-600 text-sm">{{ e }}</p>
-      {% endfor %}
-    </div>
+    <!-- ข้อมูลสูตร -->
+    <div class="bg-white rounded-2xl shadow-sm ring-1 ring-gray-200 p-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">ชื่อสูตรอาหาร</label>
+          {{ form.title }}
+          {% if form.title.errors %}<p class="text-sm text-red-600 mt-1">{{ form.title.errors|striptags }}</p>{% endif %}
+        </div>
 
-    <div>
-      <label class="block text-sm font-medium mb-1">ชื่อร้าน / แหล่งที่มา (ไม่บังคับ)</label>
-      {{ form.restaurant_name }}
-      {% for e in form.restaurant_name.errors %}
-        <p class="text-red-600 text-sm">{{ e }}</p>
-      {% endfor %}
-    </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">ชื่อร้าน (ถ้ามี)</label>
+          {{ form.restaurant_name }}
+          {% if form.restaurant_name.errors %}<p class="text-sm text-red-600 mt-1">{{ form.restaurant_name.errors|striptags }}</p>{% endif %}
+        </div>
 
-    <div>
-      <label class="block text-sm font-medium mb-1">คำอธิบายสั้น ๆ</label>
-      {{ form.description }}
-      {% for e in form.description.errors %}
-        <p class="text-red-600 text-sm">{{ e }}</p>
-      {% endfor %}
-    </div>
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium text-gray-700 mb-1">คำอธิบาย</label>
+          {{ form.description }}
+          {% if form.description.errors %}<p class="text-sm text-red-600 mt-1">{{ form.description.errors|striptags }}</p>{% endif %}
+        </div>
 
-    <div>
-      <label class="block text-sm font-medium mb-1">ส่วนผสม</label>
-      {{ form.ingredients }}
-      {% for e in form.ingredients.errors %}
-        <p class="text-red-600 text-sm">{{ e }}</p>
-      {% endfor %}
-      <p class="text-xs text-gray-400 mt-1">
-        แนะนำให้พิมพ์บรรทัดละ 1 รายการ เช่น “หมูสับ 150 กรัม”
-      </p>
-    </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">จำนวนเสิร์ฟ</label>
+          {{ form.servings }}
+          {% if form.servings.errors %}<p class="text-sm text-red-600 mt-1">{{ form.servings.errors|striptags }}</p>{% endif %}
+        </div>
 
-    <div>
-      <label class="block text-sm font-medium mb-1">วิธีทำ</label>
-      {{ form.steps }}
-      {% for e in form.steps.errors %}
-        <p class="text-red-600 text-sm">{{ e }}</p>
-      {% endfor %}
-      <p class="text-xs text-gray-400 mt-1">
-        แนะนำให้พิมพ์บรรทัดละ 1 ขั้นตอน เพื่อให้อ่านง่าย
-      </p>
-    </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">เตรียม (นาที)</label>
+            {{ form.prep_minutes }}
+            {% if form.prep_minutes.errors %}<p class="text-sm text-red-600 mt-1">{{ form.prep_minutes.errors|striptags }}</p>{% endif %}
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">ปรุง (นาที)</label>
+            {{ form.cook_minutes }}
+            {% if form.cook_minutes.errors %}<p class="text-sm text-red-600 mt-1">{{ form.cook_minutes.errors|striptags }}</p>{% endif %}
+          </div>
+        </div>
 
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-      <div>
-        <label class="block text-sm font-medium mb-1">จำนวนที่เสิร์ฟ</label>
-        {{ form.servings }}
-        {% for e in form.servings.errors %}
-          <p class="text-red-600 text-sm">{{ e }}</p>
-        {% endfor %}
-      </div>
-      <div>
-        <label class="block text-sm font-medium mb-1">เวลาตั้งเตรียม (นาที)</label>
-        {{ form.prep_minutes }}
-        {% for e in form.prep_minutes.errors %}
-          <p class="text-red-600 text-sm">{{ e }}</p>
-        {% endfor %}
-      </div>
-      <div>
-        <label class="block text-sm font-medium mb-1">เวลาในการปรุง (นาที)</label>
-        {{ form.cook_minutes }}
-        {% for e in form.cook_minutes.errors %}
-          <p class="text-red-600 text-sm">{{ e }}</p>
-        {% endfor %}
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium text-gray-700 mb-1">รูปภาพ</label>
+          {{ form.image }}
+          {% if form.image.errors %}<p class="text-sm text-red-600 mt-1">{{ form.image.errors|striptags }}</p>{% endif %}
+        </div>
       </div>
     </div>
 
-    <div>
-      <label class="block text-sm font-medium mb-1">รูปภาพเมนู (ถ้ามี)</label>
-      {{ form.image }}
-      {% for e in form.image.errors %}
-        <p class="text-red-600 text-sm">{{ e }}</p>
-      {% endfor %}
+    <!-- ✅ ต้นทุนแฝง (Hybrid) -->
+    <div class="bg-white rounded-2xl shadow-sm ring-1 ring-gray-200 p-6">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <h2 class="text-lg font-bold text-gray-900">ต้นทุนแฝง (Hybrid)</h2>
+          <p class="text-sm text-gray-500 mt-1">
+            ค่าเริ่มต้นมาจาก “การตั้งค่าบัญชี” และระบบจะคำนวณตาม เสิร์ฟ/เวลาปรุง/ชนิดเตา (ค่าประมาณการ)
+          </p>
+        </div>
+
+        <a href="{% url 'recipes:cost_settings' %}?next={{ next|default:''|urlencode }}"
+           class="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200 text-sm">
+          ตั้งค่าต้นทุนแฝง
+        </a>
+      </div>
+
+      {% if setting %}
+        <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+          <div class="rounded-xl bg-gray-50 ring-1 ring-gray-200 p-4">
+            <div class="text-xs text-gray-500">โหมดบัญชี</div>
+            <div class="font-semibold text-gray-900">{{ setting.get_mode_display }}</div>
+          </div>
+
+          <div class="rounded-xl bg-gray-50 ring-1 ring-gray-200 p-4">
+            <div class="text-xs text-gray-500">Basic ต่อเสิร์ฟ</div>
+            <div class="font-semibold text-gray-900">
+              เครื่องปรุง {{ setting.seasoning_cost_per_serving }} + แฝงอื่น {{ setting.overhead_cost_per_serving }}
+            </div>
+          </div>
+
+          <div class="rounded-xl bg-gray-50 ring-1 ring-gray-200 p-4">
+            <div class="text-xs text-gray-500">Advanced ค่าเริ่มต้น</div>
+            <div class="font-semibold text-gray-900">
+              {{ setting.get_default_stove_type_display }} · {{ setting.default_cook_minutes }} นาที
+            </div>
+            <div class="text-xs text-gray-500 mt-1">
+              ไฟ {{ setting.electricity_rate_per_kwh }} บาท/kWh · แก๊ส {{ setting.gas_cost_per_hour }} บาท/ชม.
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+              เตาที่ใช้กับสูตรนี้ (ไม่เลือก = ใช้ค่าเริ่มต้นจากบัญชี)
+            </label>
+
+            {{ form.stove_type }}
+            {% if form.stove_type.errors %}<p class="text-sm text-red-600 mt-1">{{ form.stove_type.errors|striptags }}</p>{% endif %}
+
+            <p class="text-xs text-gray-500 mt-1">
+              ถ้าโหมดบัญชีเป็น Advanced ระบบจะคิดค่าไฟ/แก๊สตามเวลาและชนิดเตาอัตโนมัติ
+            </p>
+          </div>
+
+          <!-- Preview จาก backend + realtime ด้วย JS -->
+          <div class="rounded-xl bg-orange-50 ring-1 ring-orange-200 p-4">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <div class="text-sm font-semibold text-orange-900">ประมาณการต้นทุนแฝงของสูตรนี้</div>
+                <div class="text-xs text-orange-800 mt-1">เปลี่ยนตาม เสิร์ฟ / เวลาปรุง / ชนิดเตา</div>
+              </div>
+              <div class="text-right">
+                <div class="text-xs text-orange-700">รวมต้นทุนแฝง</div>
+                <div class="text-lg font-bold text-orange-600">
+                  <span id="hidden-cost-preview">{{ hidden_preview.hidden_total|default:0|floatformat:2 }}</span> บาท
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-2 text-xs text-orange-800 leading-relaxed" id="hidden-cost-note">
+              {{ hidden_preview.note|default:"-" }}<br>
+              Basic รวม: {{ hidden_preview.basic_total|default:0|floatformat:2 }} บาท<br>
+              Energy: {{ hidden_preview.energy_cost|default:0|floatformat:2 }} บาท ({{ hidden_preview.energy_note|default:"-" }})
+            </div>
+
+            <div class="mt-2 text-xs text-orange-800">
+              ถ้าวัตต์/ค่าไฟไม่ตรงของคุณ ไปปรับที่
+              <a class="underline" href="{% url 'recipes:cost_settings' %}?next={{ next|default:''|urlencode }}">
+                ตั้งค่าต้นทุนแฝง
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- ส่ง setting เข้า JS -->
+        <script id="hybrid-setting-json" type="application/json">
+        {
+          "mode": "{{ setting.mode }}",
+          "seasoning": "{{ setting.seasoning_cost_per_serving }}",
+          "overhead": "{{ setting.overhead_cost_per_serving }}",
+          "default_stove": "{{ setting.default_stove_type }}",
+          "default_cook_minutes": "{{ setting.default_cook_minutes }}",
+          "electricity_rate": "{{ setting.electricity_rate_per_kwh }}",
+          "electric_watt": "{{ setting.electric_power_watt }}",
+          "induction_watt": "{{ setting.induction_power_watt }}",
+          "gas_per_hour": "{{ setting.gas_cost_per_hour }}"
+        }
+        </script>
+
+      {% else %}
+        <div class="mt-4 rounded-xl bg-yellow-50 ring-1 ring-yellow-200 p-4 text-sm text-yellow-800">
+          ยังไม่พบการตั้งค่าต้นทุนแฝงของบัญชี
+        </div>
+      {% endif %}
     </div>
 
-    <div class="flex gap-3 mt-4">
+    <!-- ส่วนผสม -->
+    <div class="bg-white rounded-2xl shadow-sm ring-1 ring-gray-200 p-6">
+      <div class="flex items-start justify-between gap-4 mb-4">
+        <div>
+          <h2 class="text-lg font-bold text-gray-900">ส่วนผสม</h2>
+          <p class="text-sm text-gray-500">พิมพ์ค้นหา เลือกวัตถุดิบ และกรอกกรัม ระบบคำนวณต้นทุนทันที</p>
+        </div>
+        <div class="text-right">
+          <div class="text-sm text-gray-500">รวมต้นทุนวัตถุดิบ:</div>
+          <div class="text-lg font-bold text-gray-900"><span id="total-cost">0.00</span> บาท</div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+        <div class="md:col-span-1 relative">
+          <label class="block text-sm font-medium text-gray-700 mb-1">วัตถุดิบ (Lotus)</label>
+          <input id="ingredient-search" type="text" placeholder="พิมพ์เพื่อค้นหา..." autocomplete="off"
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2" />
+          <div id="ingredient-dropdown"
+               class="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto hidden"></div>
+
+          <select id="ingredient-select" class="hidden">
+            <option value="" selected disabled>-- เลือกวัตถุดิบ --</option>
+            {% for ing in ingredients %}
+              <option value="{{ ing.id }}">{{ ing.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="md:col-span-1">
+          <label class="block text-sm font-medium text-gray-700 mb-1">กรัม</label>
+          <input id="qty-input" type="number" step="0.01" min="0" value="0"
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2" />
+        </div>
+
+        <div class="md:col-span-1">
+          <label class="block text-sm font-medium text-gray-700 mb-1">บาท/กรัม</label>
+          <input id="ppg-input" type="text" value="0.0000" readonly
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-50" />
+        </div>
+
+        <div class="md:col-span-1">
+          <label class="block text-sm font-medium text-gray-700 mb-1">ต้นทุน</label>
+          <input id="cost-input" type="text" value="0.00" readonly
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-50" />
+        </div>
+      </div>
+
+      <div class="mt-4">
+        <button id="add-row-btn" type="button"
+                class="w-full md:w-auto px-4 py-2 rounded-lg bg-orange-500 text-white font-semibold hover:bg-orange-600">
+          เพิ่มวัตถุดิบ
+        </button>
+      </div>
+
+      <div class="mt-4 overflow-x-auto">
+        <table class="min-w-full text-sm">
+          <thead>
+            <tr class="bg-gray-50 text-gray-700">
+              <th class="text-left px-3 py-2 rounded-l-lg">วัตถุดิบ</th>
+              <th class="text-right px-3 py-2">กรัม</th>
+              <th class="text-right px-3 py-2">บาท/กรัม</th>
+              <th class="text-right px-3 py-2">ต้นทุน</th>
+              <th class="text-center px-3 py-2 rounded-r-lg">ลบ</th>
+            </tr>
+          </thead>
+          <tbody id="rows-body" class="bg-white"></tbody>
+        </table>
+      </div>
+
+      <input type="hidden" name="rows_json" id="rows-input" value='{{ existing_rows_json|default:"[]"|escapejs }}'>
+    </div>
+
+    <!-- ช่องข้อความเดิม -->
+    <div class="bg-white rounded-2xl shadow-sm ring-1 ring-gray-200 p-6 space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">ส่วนผสม (ข้อความเดิม)</label>
+        {{ form.ingredients }}
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">ขั้นตอนทำอาหาร</label>
+        {{ form.steps }}
+      </div>
+    </div>
+
+    <div class="flex items-center gap-3">
       <button type="submit"
-              class="px-4 py-2 rounded-xl bg-primary text-white hover:bg-primary-dark">
-        {{ submit_text }}
+              class="flex-1 px-4 py-3 rounded-lg bg-green-600 text-white font-semibold hover:bg-green-700">
+        {{ submit_text|default:"บันทึกสูตรอาหาร" }}
       </button>
       <a href="{% url 'recipes:list' %}"
-         class="px-4 py-2 rounded-xl ring-1 ring-gray-200 text-sm hover:bg-gray-50">
+         class="px-4 py-3 rounded-lg bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200">
         ยกเลิก
       </a>
     </div>
+
   </form>
 </div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  // ===============================
+  // Ingredients table logic (ยึดของคุณ)
+  // ===============================
+  const selectEl = document.getElementById("ingredient-select");
+  const searchInput = document.getElementById("ingredient-search");
+  const dropdownEl = document.getElementById("ingredient-dropdown");
+
+  const qtyEl = document.getElementById("qty-input");
+  const ppgEl = document.getElementById("ppg-input");
+  const costEl = document.getElementById("cost-input");
+
+  const addBtn = document.getElementById("add-row-btn");
+  const bodyEl = document.getElementById("rows-body");
+  const totalEl = document.getElementById("total-cost");
+  const rowsInput = document.getElementById("rows-input");
+
+  let currentPPG = 0;
+  let rows = [];
+  try { rows = JSON.parse(rowsInput.value || "[]"); } catch(e) { rows = []; }
+
+  function getCookie(name) {
+    const v = document.cookie.split("; ").find(row => row.startsWith(name + "="));
+    return v ? decodeURIComponent(v.split("=")[1]) : "";
+  }
+  const csrftoken = getCookie("csrftoken");
+
+  async function fetchPPG(id) {
+    if (!id) return 0;
+    const res = await fetch(`/recipes/api/ingredient/${id}/`);
+    if (!res.ok) return 0;
+    const data = await res.json();
+    return parseFloat(data.price_per_gram) || 0;
+  }
+
+  async function createIngredient(name, pricePerGram) {
+    const res = await fetch("/recipes/api/ingredient/create/", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": csrftoken
+      },
+      body: JSON.stringify({ name, price_per_gram: pricePerGram })
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data.ok) return null;
+    return data;
+  }
+
+  function escapeHtml(s) {
+    return String(s)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function calcCost(grams, ppg) {
+    const g = parseFloat(grams) || 0;
+    const p = parseFloat(ppg) || 0;
+    return g * p;
+  }
+
+  function updatePreviewCost() {
+    const cost = calcCost(qtyEl.value, currentPPG);
+    costEl.value = cost.toFixed(2);
+  }
+
+  function renderTotal() {
+    let total = 0;
+    rows.forEach(r => total += (Number(r.cost_snapshot ?? r.cost) || 0));
+    totalEl.textContent = total.toFixed(2);
+  }
+
+  function syncHidden() {
+    rowsInput.value = JSON.stringify(rows.map(r => ({
+      ingredient_id: r.ingredient_id,
+      ingredient_name: r.ingredient_name,
+      quantity_grams: r.quantity_grams,
+      price_per_gram_snapshot: r.price_per_gram_snapshot ?? r.price_per_gram,
+      cost_snapshot: r.cost_snapshot ?? r.cost
+    })));
+  }
+
+  function renderRows() {
+    bodyEl.innerHTML = "";
+
+    if (!rows.length) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td colspan="5" class="px-3 py-3 text-gray-400">ยังไม่มีรายการวัตถุดิบ</td>`;
+      bodyEl.appendChild(tr);
+      renderTotal();
+      syncHidden();
+      return;
+    }
+
+    rows.forEach((r, idx) => {
+      const tr = document.createElement("tr");
+      tr.className = "border-t";
+      const grams = Number(r.quantity_grams || 0);
+      const ppg = Number(r.price_per_gram_snapshot ?? r.price_per_gram ?? 0);
+      const cost = Number(r.cost_snapshot ?? r.cost ?? 0);
+
+      tr.innerHTML = `
+        <td class="px-3 py-2">${escapeHtml(r.ingredient_name || "")}</td>
+        <td class="px-3 py-2 text-right">${grams.toFixed(2)}</td>
+        <td class="px-3 py-2 text-right">${ppg.toFixed(4)}</td>
+        <td class="px-3 py-2 text-right">${cost.toFixed(2)}</td>
+        <td class="px-3 py-2 text-center">
+          <button type="button" class="remove-btn px-2 py-1 rounded bg-red-100 text-red-600 text-xs" data-i="${idx}">
+            ลบ
+          </button>
+        </td>
+      `;
+      bodyEl.appendChild(tr);
+    });
+
+    bodyEl.querySelectorAll(".remove-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const i = parseInt(btn.dataset.i);
+        rows.splice(i, 1);
+        renderRows();
+      });
+    });
+
+    renderTotal();
+    syncHidden();
+  }
+
+  function buildItems() {
+    return Array.from(selectEl.options)
+      .filter(o => o.value)
+      .map(o => ({ id: o.value, name: o.text }));
+  }
+
+  function renderDropdown(items, queryText) {
+    dropdownEl.innerHTML = "";
+
+    if (items.length === 0) {
+      const wrap = document.createElement("div");
+      wrap.className = "p-3";
+      wrap.innerHTML = `
+        <div class="text-sm text-gray-500">ไม่พบวัตถุดิบ</div>
+        <div class="mt-2">
+          <div class="text-xs text-gray-600 mb-1">เพิ่มวัตถุดิบใหม่ (custom)</div>
+          <input id="dd-new-name" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                 placeholder="ชื่อวัตถุดิบ" value="${escapeHtml(queryText || "")}">
+          <input id="dd-new-ppg" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-2"
+                 type="number" step="0.0001" min="0" placeholder="บาท/กรัม (ถ้าไม่รู้ใส่ 0)">
+          <button id="dd-create-btn" type="button"
+                  class="w-full mt-2 px-3 py-2 rounded-lg bg-gray-900 text-white text-sm hover:bg-black">
+            เพิ่มเข้าฐานข้อมูล
+          </button>
+        </div>
+      `;
+      dropdownEl.appendChild(wrap);
+
+      const createBtn = dropdownEl.querySelector("#dd-create-btn");
+      createBtn.addEventListener("click", async () => {
+        const nameEl = dropdownEl.querySelector("#dd-new-name");
+        const ppgEl2 = dropdownEl.querySelector("#dd-new-ppg");
+
+        const name = (nameEl.value || "").trim();
+        const ppg = parseFloat(ppgEl2.value || "0") || 0;
+
+        if (!name) { alert("กรุณากรอกชื่อวัตถุดิบ"); return; }
+
+        createBtn.disabled = true;
+        createBtn.textContent = "กำลังเพิ่ม...";
+
+        const created = await createIngredient(name, ppg);
+
+        createBtn.disabled = false;
+        createBtn.textContent = "เพิ่มเข้าฐานข้อมูล";
+
+        if (!created) { alert("เพิ่มวัตถุดิบไม่สำเร็จ"); return; }
+
+        let opt = Array.from(selectEl.options).find(o => o.value === String(created.id));
+        if (!opt) {
+          opt = document.createElement("option");
+          opt.value = created.id;
+          opt.textContent = created.name;
+          selectEl.appendChild(opt);
+        }
+
+        selectEl.value = String(created.id);
+        searchInput.value = created.name;
+        dropdownEl.classList.add("hidden");
+
+        currentPPG = parseFloat(created.price_per_gram) || 0;
+        ppgEl.value = currentPPG.toFixed(4);
+        updatePreviewCost();
+      });
+
+      return;
+    }
+
+    items.slice(0, 50).forEach(item => {
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = "w-full text-left px-3 py-2 text-sm hover:bg-orange-50";
+      row.textContent = item.name;
+      row.addEventListener("click", async () => {
+        selectEl.value = item.id;
+        searchInput.value = item.name;
+        dropdownEl.classList.add("hidden");
+
+        currentPPG = await fetchPPG(item.id);
+        ppgEl.value = currentPPG.toFixed(4);
+        updatePreviewCost();
+      });
+      dropdownEl.appendChild(row);
+    });
+  }
+
+  function openDropdown() {
+    const allItems = buildItems();
+    const q = (searchInput.value || "").trim().toLowerCase();
+    const filtered = q ? allItems.filter(x => x.name.toLowerCase().includes(q)) : allItems;
+    renderDropdown(filtered, searchInput.value || "");
+    dropdownEl.classList.remove("hidden");
+  }
+
+  searchInput.addEventListener("focus", openDropdown);
+  searchInput.addEventListener("input", () => {
+    openDropdown();
+    const q = (searchInput.value || "").trim();
+    if (!q) {
+      selectEl.value = "";
+      currentPPG = 0;
+      ppgEl.value = "0.0000";
+      updatePreviewCost();
+    }
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!dropdownEl.contains(e.target) && e.target !== searchInput) {
+      dropdownEl.classList.add("hidden");
+    }
+  });
+
+  qtyEl.addEventListener("input", updatePreviewCost);
+
+  addBtn.addEventListener("click", async () => {
+    const id = selectEl.value;
+    const grams = parseFloat(qtyEl.value) || 0;
+
+    if (!id) { alert("กรุณาเลือกวัตถุดิบ"); return; }
+    if (grams <= 0) { alert("กรุณากรอกกรัม"); return; }
+
+    if (!currentPPG || currentPPG <= 0) {
+      currentPPG = await fetchPPG(id);
+      ppgEl.value = currentPPG.toFixed(4);
+    }
+
+    const opt = Array.from(selectEl.options).find(o => o.value === String(id));
+    const name = opt ? opt.text : "";
+    const cost = calcCost(grams, currentPPG);
+
+    const existIdx = rows.findIndex(x => String(x.ingredient_id) === String(id));
+    const rowObj = {
+      ingredient_id: parseInt(id),
+      ingredient_name: name,
+      quantity_grams: grams,
+      price_per_gram_snapshot: currentPPG,
+      cost_snapshot: cost
+    };
+
+    if (existIdx >= 0) rows[existIdx] = rowObj;
+    else rows.push(rowObj);
+
+    qtyEl.value = "0";
+    updatePreviewCost();
+    renderRows();
+  });
+
+  updatePreviewCost();
+  renderRows();
+
+  // ===============================
+  // Hybrid hidden cost preview (Realtime) - ตรงกับ setting
+  // ===============================
+  const hiddenEl = document.getElementById("hidden-cost-preview");
+  const hiddenNoteEl = document.getElementById("hidden-cost-note");
+
+  const stoveSelect = document.getElementById("id_stove_type");
+  const servingsInput = document.getElementById("id_servings");
+  const cookMinInput = document.getElementById("id_cook_minutes");
+
+  function toNum(x) {
+    const n = parseFloat(String(x ?? "0").replaceAll(",", ""));
+    return Number.isFinite(n) ? n : 0;
+  }
+  function money(x) {
+    return (Math.round((toNum(x) + Number.EPSILON) * 100) / 100).toFixed(2);
+  }
+  function getSetting() {
+    const el = document.getElementById("hybrid-setting-json");
+    if (!el) return null;
+    try { return JSON.parse(el.textContent || "{}"); } catch { return null; }
+  }
+
+  function computeHiddenPreview() {
+    if (!hiddenEl || !hiddenNoteEl) return;
+
+    const s = getSetting();
+    if (!s) return;
+
+    const servings = Math.max(parseInt(servingsInput?.value || "1", 10) || 1, 1);
+    const seasoning = toNum(s.seasoning);
+    const overhead = toNum(s.overhead);
+    const basicPerServing = seasoning + overhead;
+    const basicTotal = basicPerServing * servings;
+
+    const mode = (s.mode || "basic").trim();
+
+    if (mode === "basic") {
+      hiddenEl.textContent = money(basicTotal);
+      hiddenNoteEl.innerHTML =
+        `Basic = (เครื่องปรุง ${money(seasoning)} + แฝง ${money(overhead)}) × ${servings} เสิร์ฟ<br>` +
+        `Basic รวม: <b>${money(basicTotal)}</b> บาท<br>` +
+        `Energy: <b>0.00</b> บาท (โหมด Basic ไม่คิดค่าไฟ/แก๊ส)`;
+      return;
+    }
+
+    const stovePicked = (stoveSelect?.value || "").trim();
+    const stove = stovePicked || (s.default_stove || "electric");
+
+    let cookMin = parseInt(cookMinInput?.value || "0", 10) || 0;
+    if (cookMin <= 0) cookMin = parseInt(s.default_cook_minutes || "0", 10) || 0;
+
+    const hours = cookMin / 60.0;
+
+    let energyCost = 0;
+    let energyNote = "-";
+
+    if (stove === "gas") {
+      const gasPerHour = toNum(s.gas_per_hour);
+      energyCost = gasPerHour * hours;
+      energyNote = `แก๊ส ${money(gasPerHour)} บาท/ชม × ${cookMin} นาที`;
+    } else {
+      const rate = toNum(s.electricity_rate);
+      const watt = (stove === "induction") ? toNum(s.induction_watt) : toNum(s.electric_watt);
+      const kwh = (watt / 1000.0) * hours;
+      energyCost = rate * kwh;
+      energyNote = `ไฟ ${Math.round(watt)}W → ${kwh.toFixed(3)} kWh × ${money(rate)} บาท/kWh`;
+    }
+
+    const totalHidden = basicTotal + energyCost;
+
+    hiddenEl.textContent = money(totalHidden);
+    hiddenNoteEl.innerHTML =
+      `Advanced = (Basic × ${servings} เสิร์ฟ) + Energy<br>` +
+      `Basic รวม: <b>${money(basicTotal)}</b> บาท<br>` +
+      `Energy: <b>${money(energyCost)}</b> บาท (${energyNote})`;
+  }
+
+  if (stoveSelect) stoveSelect.addEventListener("change", computeHiddenPreview);
+  if (servingsInput) servingsInput.addEventListener("input", computeHiddenPreview);
+  if (cookMinInput) cookMinInput.addEventListener("input", computeHiddenPreview);
+
+  computeHiddenPreview();
+});
+</script>
 {% endblock %}

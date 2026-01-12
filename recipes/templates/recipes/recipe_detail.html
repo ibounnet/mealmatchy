@@ -1,76 +1,216 @@
 {% extends "base.html" %}
-{% block title %}{{ recipe.title }} – สูตรอาหาร{% endblock %}
+{% block title %}{{ recipe.title }}{% endblock %}
 
 {% block content %}
-<div class="max-w-3xl mx-auto px-4 py-8">
-  <a href="{% url 'recipes:list' %}"
-     class="text-sm text-gray-500 hover:text-orange-500">
-    « กลับไปรวมสูตรอาหาร
-  </a>
+<div class="max-w-5xl mx-auto">
 
-  <div class="mt-4 bg-white rounded-2xl shadow-card border border-gray-200 overflow-hidden">
-    {% if recipe.image %}
-      <img src="{{ recipe.image.url }}" alt="{{ recipe.title }}"
-           class="w-full h-64 object-cover">
-    {% endif %}
-
-    <div class="p-6 space-y-4">
-      <div class="flex justify-between items-start gap-4">
-        <div>
-          <h1 class="text-2xl font-bold text-gray-900">{{ recipe.title }}</h1>
-          <p class="text-sm text-gray-500 mt-1">
-            {% if recipe.created_by %}
-              โดย <span class="font-medium text-gray-800">
-                {{ recipe.created_by.username }}
-              </span>
-            {% endif %}
-            {% if recipe.created_at %}
-              · {{ recipe.created_at|date:"j F Y" }}
-            {% endif %}
-          </p>
-        </div>
-
-        {% if request.user.is_staff or recipe.created_by_id == request.user.id %}
-          <div class="flex gap-2">
-            <a href="{% url 'recipes:edit' recipe.id %}"
-               class="px-3 py-1 rounded-lg border border-orange-400 text-xs text-orange-600 hover:bg-orange-50">
-              แก้ไข
-            </a>
-            <a href="{% url 'recipes:delete' recipe.id %}"
-               class="px-3 py-1 rounded-lg border border-red-400 text-xs text-red-600 hover:bg-red-50">
-              ลบ
-            </a>
+  <!-- HEADER CARD -->
+  <div class="bg-white rounded-2xl shadow-sm ring-1 ring-gray-200 p-6">
+    <div class="flex flex-col md:flex-row gap-6">
+      <div class="md:w-1/3">
+        {% if recipe.image %}
+          <img src="{{ recipe.image.url }}"
+               class="w-full h-56 object-cover rounded-xl ring-1 ring-gray-200"
+               alt="{{ recipe.title }}">
+        {% else %}
+          <div class="w-full h-56 rounded-xl bg-orange-50 ring-1 ring-orange-200 flex items-center justify-center text-orange-700 text-sm">
+            ยังไม่ได้อัปโหลดรูปอาหาร แนะนำให้ใส่รูปเพื่อความสมจริงตอน demo
           </div>
         {% endif %}
       </div>
 
-      {% if recipe.description %}
-        <div>
-          <h2 class="text-base font-semibold text-gray-900 mb-1">คำอธิบายสูตร</h2>
-          <p class="text-sm text-gray-700 whitespace-pre-line">
-            {{ recipe.description }}
-          </p>
-        </div>
-      {% endif %}
+      <div class="flex-1">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <h1 class="text-2xl font-bold text-gray-900">{{ recipe.title }}</h1>
+            <div class="text-sm text-gray-500 mt-1">
+              ร้าน/แหล่งที่มา: {{ recipe.restaurant_name|default:"-" }}
+            </div>
 
-      {% if recipe.ingredients %}
-        <div>
-          <h2 class="text-base font-semibold text-gray-900 mb-1">ส่วนผสม</h2>
-          <p class="text-sm text-gray-700 whitespace-pre-line">
-            {{ recipe.ingredients }}
-          </p>
-        </div>
-      {% endif %}
+            {% if recipe.description %}
+              <p class="text-gray-700 mt-3">{{ recipe.description }}</p>
+            {% endif %}
+          </div>
 
-      {% if recipe.steps %}
-        <div>
-          <h2 class="text-base font-semibold text-gray-900 mb-1">วิธีทำ</h2>
-          <p class="text-sm text-gray-700 whitespace-pre-line">
-            {{ recipe.steps }}
-          </p>
+          <div class="text-right">
+            <div class="text-xs text-gray-500">ต้นทุนรวม (Hybrid)</div>
+            <div class="text-2xl font-bold text-orange-600">
+              {% if cost_breakdown %}{{ cost_breakdown.total_cost|floatformat:2 }}{% else %}{{ total_cost|floatformat:2 }}{% endif %}
+              บาท
+            </div>
+            {% if cost_breakdown %}
+              <div class="text-xs text-gray-500 mt-1">เฉลี่ย/เสิร์ฟ {{ cost_breakdown.per_serving|floatformat:2 }} บาท</div>
+            {% endif %}
+          </div>
         </div>
-      {% endif %}
+
+        <div class="mt-4 flex flex-wrap items-center gap-2">
+          <a href="{% url 'recipes:edit' recipe.id %}"
+             class="px-4 py-2 rounded-lg bg-orange-500 text-white font-semibold hover:bg-orange-600">
+            แก้ไขสูตร
+          </a>
+
+          <!-- ถ้าคุณใช้ชื่อ url เป็น recipes:cooking_cost_settings ให้เปลี่ยนบรรทัดนี้ -->
+          <a href="{% url 'recipes:cost_settings' %}?next={{ request.get_full_path|urlencode }}"
+            class="text-sm text-orange-600 hover:underline">
+          ตั้งค่าต้นทุนแฝง
+        </a>
+
+
+          <a href="{% url 'recipes:list' %}"
+             class="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200">
+            กลับหน้ารวมสูตร
+          </a>
+        </div>
+      </div>
     </div>
   </div>
+
+  <!-- ✅ BREAKDOWN (UX แบบสรุปก่อน แล้วค่อยลงรายละเอียด) -->
+  {% if cost_breakdown %}
+    <div class="mt-6 bg-white rounded-2xl shadow-sm ring-1 ring-gray-200 p-6">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <h2 class="text-lg font-bold text-gray-900">สรุปต้นทุน (Breakdown)</h2>
+          <p class="text-sm text-gray-500">
+            แยกเป็น “วัตถุดิบ” และ “ต้นทุนแฝง” เพื่อให้เห็นภาพชัดแบบกรรมการชอบ
+          </p>
+        </div>
+
+        <div class="text-right">
+          <div class="text-xs text-gray-500">โหมด</div>
+          <div class="text-sm font-semibold text-gray-900">{{ cost_breakdown.mode }}</div>
+        </div>
+      </div>
+
+      <!-- 4 CARDS -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
+        <div class="rounded-2xl ring-1 ring-gray-200 p-4">
+          <div class="text-xs text-gray-500">ต้นทุนวัตถุดิบ</div>
+          <div class="text-xl font-bold text-gray-900">{{ cost_breakdown.ingredient_cost|floatformat:2 }} บาท</div>
+        </div>
+
+        <div class="rounded-2xl ring-1 ring-gray-200 p-4">
+          <div class="text-xs text-gray-500">ต้นทุนแฝง</div>
+          <div class="text-xl font-bold text-gray-900">{{ cost_breakdown.hidden_cost|floatformat:2 }} บาท</div>
+        </div>
+
+        <div class="rounded-2xl ring-1 ring-gray-200 p-4">
+          <div class="text-xs text-gray-500">รวมทั้งหมด</div>
+          <div class="text-xl font-bold text-orange-600">{{ cost_breakdown.total_cost|floatformat:2 }} บาท</div>
+        </div>
+
+        <div class="rounded-2xl ring-1 ring-gray-200 p-4">
+          <div class="text-xs text-gray-500">เฉลี่ยต่อเสิร์ฟ</div>
+          <div class="text-xl font-bold text-gray-900">{{ cost_breakdown.per_serving|floatformat:2 }} บาท</div>
+        </div>
+      </div>
+
+      <!-- NOTE -->
+      <div class="mt-3 text-xs text-gray-500">
+        วิธีคิด: {{ cost_breakdown.note }}
+      </div>
+
+      <!-- DETAIL (Collapsible) -->
+      <details class="mt-4 rounded-2xl bg-gray-50 ring-1 ring-gray-200 p-4">
+        <summary class="cursor-pointer select-none text-sm font-semibold text-gray-900">
+          ดูรายละเอียดต้นทุนแฝง
+          <span class="text-xs font-normal text-gray-500"> (กดเพื่อขยาย)</span>
+        </summary>
+
+        <div class="mt-3 overflow-x-auto">
+          <table class="min-w-full text-sm">
+            <thead>
+              <tr class="bg-white text-gray-700">
+                <th class="text-left px-3 py-2 rounded-l-lg">รายการ</th>
+                <th class="text-right px-3 py-2 rounded-r-lg">จำนวนเงิน (บาท)</th>
+              </tr>
+            </thead>
+            <tbody class="bg-gray-50">
+              <tr class="border-t border-gray-200">
+                <td class="px-3 py-2">เครื่องปรุงเฉลี่ย</td>
+                <td class="px-3 py-2 text-right">
+                  {{ cost_breakdown.seasoning_total|default:0|floatformat:2 }}
+                </td>
+              </tr>
+
+              <tr class="border-t border-gray-200">
+                <td class="px-3 py-2">ต้นทุนแฝงอื่น ๆ</td>
+                <td class="px-3 py-2 text-right">
+                  {{ cost_breakdown.overhead_total|default:0|floatformat:2 }}
+                </td>
+              </tr>
+
+              <tr class="border-t border-gray-200">
+                <td class="px-3 py-2">
+                  ค่าไฟ/แก๊ส
+                  {% if cost_breakdown.energy_note %}
+                    <div class="text-xs text-gray-500 mt-1">{{ cost_breakdown.energy_note }}</div>
+                  {% else %}
+                    <div class="text-xs text-gray-500 mt-1">ถ้าเป็น basic จะเป็น 0</div>
+                  {% endif %}
+                </td>
+                <td class="px-3 py-2 text-right">
+                  {{ cost_breakdown.energy_cost|default:0|floatformat:2 }}
+                </td>
+              </tr>
+
+              <tr class="border-t border-gray-200 font-semibold bg-white">
+                <td class="px-3 py-2">รวมต้นทุนแฝง</td>
+                <td class="px-3 py-2 text-right">{{ cost_breakdown.hidden_cost|floatformat:2 }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </div>
+  {% endif %}
+
+  <!-- INGREDIENTS -->
+  <div class="mt-6 bg-white rounded-2xl shadow-sm ring-1 ring-gray-200 p-6">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-lg font-bold text-gray-900">วัตถุดิบ (ดึงจาก DB Lotus)</h2>
+      <div class="text-right">
+        <div class="text-xs text-gray-500">ต้นทุนวัตถุดิบรวม</div>
+        <div class="text-lg font-bold text-gray-900">{{ total_cost|floatformat:2 }} บาท</div>
+      </div>
+    </div>
+
+    {% if rows %}
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-sm">
+          <thead>
+            <tr class="bg-gray-50 text-gray-700">
+              <th class="text-left px-3 py-2 rounded-l-lg">วัตถุดิบ</th>
+              <th class="text-right px-3 py-2">กรัม</th>
+              <th class="text-right px-3 py-2">บาท/กรัม (snapshot)</th>
+              <th class="text-right px-3 py-2 rounded-r-lg">ต้นทุน (snapshot)</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white">
+            {% for r in rows %}
+              <tr class="border-t">
+                <td class="px-3 py-2">{{ r.ingredient.name }}</td>
+                <td class="px-3 py-2 text-right">{{ r.quantity_grams|floatformat:2 }}</td>
+                <td class="px-3 py-2 text-right">{{ r.price_per_gram_snapshot|floatformat:4 }}</td>
+                <td class="px-3 py-2 text-right font-semibold">{{ r.cost_snapshot|floatformat:2 }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="rounded-xl bg-red-50 ring-1 ring-red-200 p-4 text-red-700 text-sm">
+        สูตรนี้ยังไม่มีวัตถุดิบจาก Lotus ที่ถูกบันทึกลงฐานข้อมูล กรุณากด “แก้ไขสูตร” แล้วเพิ่มวัตถุดิบอย่างน้อย 1 รายการ
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- STEPS -->
+  <div class="mt-6 bg-white rounded-2xl shadow-sm ring-1 ring-gray-200 p-6">
+    <h2 class="text-lg font-bold text-gray-900 mb-2">วิธีทำ</h2>
+    <div class="text-gray-700 whitespace-pre-line">{{ recipe.steps|default:"-" }}</div>
+  </div>
+
 </div>
 {% endblock %}
