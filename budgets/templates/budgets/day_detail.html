@@ -175,38 +175,71 @@
       <div class="bg-white rounded-2xl shadow-card ring-1 ring-gray-200 p-5">
         <h3 class="text-lg font-bold mb-1">เมนู/สูตรอาหารแนะนำ</h3>
         <p class="text-xs text-gray-500 mb-4">
-          แนะนำสูตร “ใกล้เคียง” จากคำหลักในชื่อเมนูของวันนี้
+          ระบบจะแนะนำสูตรที่ “ใกล้เคียง” จากชื่อเมนูของวันนี้ และเปรียบเทียบให้เห็นว่า “ประหยัดกว่า/แพงกว่า” อย่างไร
         </p>
 
-        {% if suggested_recipes %}
+        {% if recipe_matches %}
           <div class="space-y-3">
-            {% for r in suggested_recipes %}
-              <a href="{% url 'recipes:detail' r.id %}"
-                 class="flex items-center gap-3 bg-gray-50 hover:bg-gray-100 rounded-xl px-3 py-2 transition">
-                {% if r.image %}
-                  <img src="{{ r.image.url }}" alt="{{ r.title }}"
-                       class="w-12 h-12 rounded-lg object-cover flex-shrink-0">
-                {% else %}
-                  <div class="w-12 h-12 rounded-lg bg-orange-50 text-xs flex items-center justify-center text-orange-700">
-                    สูตรอาหาร
-                  </div>
-                {% endif %}
-                <div>
-                  <div class="text-sm font-semibold text-gray-900">
-                    {{ r.title }}
-                  </div>
-                  {% if r.restaurant_name %}
-                    <div class="text-[11px] text-gray-500">
-                      จาก: {{ r.restaurant_name }}
+            {% for item in recipe_matches %}
+              <a href="{% url 'recipes:detail' item.recipe.id %}"
+                 class="block bg-gray-50 hover:bg-gray-100 rounded-xl px-3 py-3 transition ring-1 ring-gray-200">
+                <div class="flex gap-3">
+                  {% if item.recipe.image %}
+                    <img src="{{ item.recipe.image.url }}" alt="{{ item.recipe.title }}"
+                         class="w-12 h-12 rounded-lg object-cover flex-shrink-0">
+                  {% else %}
+                    <div class="w-12 h-12 rounded-lg bg-orange-50 text-xs flex items-center justify-center text-orange-700 flex-shrink-0">
+                      สูตรอาหาร
                     </div>
                   {% endif %}
+
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-start justify-between gap-2">
+                      <div class="text-sm font-semibold text-gray-900 truncate">
+                        {{ item.recipe.title }}
+                      </div>
+                      <span class="text-[11px] px-2 py-1 rounded-full ring-1 {{ item.badge_class }}">
+                        {{ item.badge }}
+                      </span>
+                    </div>
+
+                    <div class="mt-1 text-[12px] text-gray-600">
+                      เทียบกับเมนู: <span class="font-semibold text-gray-800">{{ item.compare_menu_name }}</span>
+                      ({{ item.compare_menu_price }} ฿/จาน)
+                    </div>
+
+                    <div class="mt-1 text-[12px] text-gray-700">
+                      ต้นทุนสูตรนี้: <span class="font-semibold text-gray-900">{{ item.cost_per_serving }} ฿</span> / เสิร์ฟ
+                      · <span class="font-semibold {% if item.diff > 0 %}text-green-700{% elif item.diff < 0 %}text-red-700{% else %}text-gray-700{% endif %}">
+                        {{ item.diff_text }}
+                      </span>
+                    </div>
+
+                    <div class="mt-2 flex flex-wrap gap-2">
+                      {% if item.fit_remaining %}
+                        <span class="text-[11px] px-2 py-1 rounded-full bg-green-50 text-green-700 ring-1 ring-green-200">
+                          เข้าในงบคงเหลือของวันนี้
+                        </span>
+                      {% else %}
+                        <span class="text-[11px] px-2 py-1 rounded-full bg-red-50 text-red-700 ring-1 ring-red-200">
+                          เกินงบคงเหลือของวันนี้
+                        </span>
+                      {% endif %}
+
+                      {% if item.fit_today_budget %}
+                        <span class="text-[11px] px-2 py-1 rounded-full bg-gray-50 text-gray-700 ring-1 ring-gray-200">
+                          ไม่เกินงบต่อวัน
+                        </span>
+                      {% endif %}
+                    </div>
+                  </div>
                 </div>
               </a>
             {% endfor %}
           </div>
         {% else %}
           <p class="text-sm text-gray-400">
-            ยังไม่มีสูตรอาหารแนะนำสำหรับเมนูในแผนวันนี้
+            วันนี้ยังไม่มีข้อมูลเมนูในแผนให้ระบบ “เทียบต้นทุน” เพื่อแนะนำสูตรอาหาร
           </p>
         {% endif %}
       </div>

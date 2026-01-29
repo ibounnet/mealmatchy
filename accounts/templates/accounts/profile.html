@@ -1,87 +1,265 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 {% block title %}โปรไฟล์ของฉัน{% endblock %}
-{% block content %}
-<div class="max-w-3xl mx-auto">
-  <h1 class="text-2xl font-bold text-gray-900 mb-6">โปรไฟล์ของฉัน</h1>
 
-  <div class="bg-white rounded-2xl ring-1 ring-gray-100 p-6 space-y-6">
-    <!-- Header: รูป + ชื่อ -->
-    <div class="flex items-center gap-4">
-      <div class="w-20 h-20 rounded-2xl overflow-hidden bg-gray-100 ring-1 ring-gray-200">
-        {% if profile.profile_picture %}
-          <img src="{{ profile.profile_picture.url }}" alt="Profile" class="w-full h-full object-cover">
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+  <div class="mb-6">
+    <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">โปรไฟล์ของฉัน</h1>
+    <p class="text-sm text-gray-600 mt-1">จัดการข้อมูลส่วนตัว และดูสรุปกิจกรรมของคุณใน MealMatchy</p>
+  </div>
+
+  {% if messages %}
+    <div class="space-y-2 mb-6">
+      {% for message in messages %}
+        <div class="px-4 py-3 rounded-xl text-sm ring-1
+          {% if message.tags == 'success' %}bg-green-50 text-green-700 ring-green-200
+          {% elif message.tags == 'error' %}bg-red-50 text-red-700 ring-red-200
+          {% else %}bg-gray-50 text-gray-700 ring-gray-200{% endif %}">
+          {{ message }}
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <!-- Active Plan -->
+  <div class="bg-white rounded-2xl ring-1 ring-gray-200 p-5 mb-6">
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      <div class="flex items-start gap-4">
+        <div class="w-14 h-14 rounded-2xl bg-orange-50 ring-1 ring-orange-100 flex items-center justify-center">
+          <div class="text-orange-600 font-bold text-sm">PLAN</div>
+        </div>
+
+        <div class="min-w-0">
+          <div class="flex items-center gap-2 flex-wrap">
+            <h2 class="text-lg font-semibold text-gray-900">แผนอาหารที่กำลังใช้งาน</h2>
+            {% if active_plan %}
+              <span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-50 text-green-700 ring-1 ring-green-200">
+                กำลังใช้งาน
+              </span>
+            {% else %}
+              <span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-50 text-gray-600 ring-1 ring-gray-200">
+                ยังไม่มีแผนที่ใช้งาน
+              </span>
+            {% endif %}
+          </div>
+
+          {% if active_plan %}
+            <p class="text-sm text-gray-700 mt-1">
+              ช่วงวันที่
+              <span class="font-semibold">{{ active_plan.start_date|date:"d M Y" }}</span> –
+              <span class="font-semibold">{{ active_plan_end|date:"d M Y" }}</span>
+              <span class="text-gray-300">|</span>
+              {{ active_plan.days }} วัน
+              <span class="text-gray-300">|</span>
+              งบ/วัน <span class="font-semibold">{{ active_plan.budget_per_day }}</span> บาท
+            </p>
+          {% else %}
+            <p class="text-sm text-gray-600 mt-1">แนะนำ: สร้างแผน 1 วัน/7 วัน เพื่อให้ระบบสรุปงบและแดชบอร์ดทำงานครบ</p>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="flex flex-wrap gap-2">
+        {% if active_plan %}
+          <a href="{% url 'budgets:home' %}?from_plan=1"
+             class="px-4 py-2 rounded-xl bg-orange-500 text-white text-sm font-semibold hover:bg-orange-600">
+            ตารางงบ (แผนนี้)
+          </a>
+          <a href="{% url 'budgets:dashboard' %}?from_plan=1"
+             class="px-4 py-2 rounded-xl ring-1 ring-gray-200 text-gray-900 text-sm font-semibold hover:bg-gray-50">
+            Dashboard (แผนนี้)
+          </a>
+          <a href="{% url 'plan:my_plans' %}"
+             class="px-4 py-2 rounded-xl ring-1 ring-gray-200 text-gray-900 text-sm hover:bg-gray-50">
+            เปลี่ยนแผน
+          </a>
         {% else %}
-          <div class="w-full h-full flex items-center justify-center text-gray-400 text-sm">ไม่มีรูป</div>
+          <a href="{% url 'plan:start' %}"
+             class="px-4 py-2 rounded-xl bg-orange-500 text-white text-sm font-semibold hover:bg-orange-600">
+            สร้างแผนใหม่
+          </a>
+          <a href="{% url 'plan:my_plans' %}"
+             class="px-4 py-2 rounded-xl ring-1 ring-gray-200 text-gray-900 text-sm hover:bg-gray-50">
+            ดูแผนของฉัน
+          </a>
         {% endif %}
       </div>
-      <div>
-        <div class="text-lg font-semibold">{{ request.user.get_full_name|default:request.user.username }}</div>
-        <div class="text-sm text-gray-500">{{ request.user.email|default:"-" }}</div>
+    </div>
+  </div>
+
+  <!-- Profile + Form -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+
+    <!-- User Card -->
+    <div class="bg-white rounded-2xl ring-1 ring-gray-200 p-5">
+      <div class="flex items-center gap-4">
+        <div class="w-16 h-16 rounded-2xl overflow-hidden ring-1 ring-gray-200 bg-gray-100 flex items-center justify-center">
+          {% if profile.profile_picture %}
+            <img src="{{ profile.profile_picture.url }}" class="w-full h-full object-cover" alt="profile">
+          {% else %}
+            <span class="text-gray-400 text-xs">No Image</span>
+          {% endif %}
+        </div>
+
+        <div class="min-w-0">
+          <div class="text-lg font-bold text-gray-900 truncate">{{ user.first_name }} {{ user.last_name }}</div>
+          <div class="text-sm text-gray-600 truncate">{{ user.email }}</div>
+          <div class="text-xs text-gray-500 mt-1">วันนี้: {{ today|date:"d M Y" }}</div>
+        </div>
+      </div>
+
+      <div class="mt-5 grid grid-cols-2 gap-3">
+        <div class="rounded-xl bg-gray-50 ring-1 ring-gray-200 p-3">
+          <div class="text-xs text-gray-500">โพสต์ของฉัน</div>
+          <div class="text-xl font-bold text-gray-900 mt-1">{{ my_posts_count|default:0 }}</div>
+        </div>
+        <div class="rounded-xl bg-gray-50 ring-1 ring-gray-200 p-3">
+          <div class="text-xs text-gray-500">สูตรของฉัน</div>
+          <div class="text-xl font-bold text-gray-900 mt-1">{{ my_recipes_count|default:0 }}</div>
+        </div>
+        <div class="rounded-xl bg-gray-50 ring-1 ring-gray-200 p-3">
+          <div class="text-xs text-gray-500">เมนูโปรด</div>
+          <div class="text-xl font-bold text-gray-900 mt-1">{{ favorite_menus_count|default:0 }}</div>
+        </div>
+        <div class="rounded-xl bg-gray-50 ring-1 ring-gray-200 p-3">
+          <div class="text-xs text-gray-500">แผนทั้งหมด</div>
+          <div class="text-xl font-bold text-gray-900 mt-1">{{ my_plans_count|default:0 }}</div>
+        </div>
       </div>
     </div>
 
-    <!-- ฟอร์มอัปเดตข้อมูล + รูป (ไม่ซ้อนกับฟอร์มอื่น) -->
-    <form method="POST" enctype="multipart/form-data" class="grid grid-cols-1 gap-5">
-      {% csrf_token %}
-      <input type="hidden" name="action" value="update">
+    <!-- Edit Form -->
+    <div class="lg:col-span-2 bg-white rounded-2xl ring-1 ring-gray-200 p-5">
+      <div class="mb-4">
+        <h2 class="text-lg font-semibold text-gray-900">แก้ไขข้อมูลโปรไฟล์</h2>
+        <p class="text-sm text-gray-600">แก้ชื่อ/อีเมล/แนะนำตัว และอัปโหลดรูปโปรไฟล์</p>
+      </div>
 
-      <div class="grid sm:grid-cols-2 gap-4">
-        <div>
-          <label class="block text-sm text-gray-700 mb-1">ชื่อ</label>
-          {{ uform.first_name }}
-          {% for e in uform.first_name.errors %}<p class="mt-1 text-sm text-red-600">{{ e }}</p>{% endfor %}
+      {% if uform.errors or pform.errors %}
+        <div class="mb-4 rounded-xl bg-red-50 ring-1 ring-red-200 p-4 text-sm text-red-700">
+          <div class="font-semibold mb-2">ฟอร์มมีข้อผิดพลาด</div>
+          {{ uform.errors }}
+          {{ pform.errors }}
         </div>
-        <div>
-          <label class="block text-sm text-gray-700 mb-1">นามสกุล</label>
-          {{ uform.last_name }}
-          {% for e in uform.last_name.errors %}<p class="mt-1 text-sm text-red-600">{{ e }}</p>{% endfor %}
+      {% endif %}
+
+      <form method="post" enctype="multipart/form-data" class="space-y-4">
+        {% csrf_token %}
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">ชื่อ</label>
+            {{ uform.first_name }}
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">นามสกุล</label>
+            {{ uform.last_name }}
+          </div>
         </div>
-      </div>
 
-      <div>
-        <label class="block text-sm text-gray-700 mb-1">อีเมล</label>
-        {{ uform.email }}
-        {% for e in uform.email.errors %}<p class="mt-1 text-sm text-red-600">{{ e }}</p>{% endfor %}
-      </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">อีเมล</label>
+          {{ uform.email }}
+        </div>
 
-      <div>
-        <label class="block text-sm text-gray-700 mb-1">แนะนำตัว</label>
-        {{ pform.bio }}
-        {% for e in pform.bio.errors %}<p class="mt-1 text-sm text-red-600">{{ e }}</p>{% endfor %}
-      </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">แนะนำตัว</label>
+          {{ pform.bio }}
+        </div>
 
-      <div>
-        <label class="block text-sm text-gray-700 mb-1">รูปโปรไฟล์</label>
-        {{ pform.profile_picture }}
-        {% for e in pform.profile_picture.errors %}<p class="mt-1 text-sm text-red-600">{{ e }}</p>{% endfor %}
-      </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">รูปโปรไฟล์</label>
+          {{ pform.profile_picture }}
+          {% if profile.profile_picture %}
+            <p class="text-xs text-gray-500 mt-1">ปัจจุบัน: {{ profile.profile_picture.name }}</p>
+          {% endif %}
+        </div>
 
-      <div class="flex items-center gap-3">
-        <button class="px-4 py-2 rounded-xl bg-primary text-white hover:bg-primary-dark transition">
-          บันทึกการเปลี่ยนแปลง
-        </button>
-      </div>
-    </form>
+        <div class="flex flex-wrap gap-2 justify-end pt-2">
+          <button type="submit"
+                  class="px-4 py-2 rounded-xl bg-orange-500 text-white text-sm font-semibold hover:bg-orange-600">
+            บันทึก
+          </button>
 
-    <!-- ฟอร์มลบรูป (แยกฟอร์ม) -->
-    <form method="POST" class="inline-block"
-          onsubmit="return confirm('ยืนยันลบรูปโปรไฟล์?')">
-      {% csrf_token %}
-      <input type="hidden" name="action" value="remove_picture">
-      <button class="px-4 py-2 rounded-xl ring-1 ring-red-300 text-red-600 hover:bg-red-50">
-        ลบรูปโปรไฟล์
-      </button>
-    </form>
+          <a href="{% url 'accounts:profile' %}"
+             class="px-4 py-2 rounded-xl ring-1 ring-gray-200 text-gray-900 text-sm hover:bg-gray-50">
+            รีเฟรช
+          </a>
+        </div>
+      </form>
 
-    <!-- ฟอร์มลบโปรไฟล์ (แยกฟอร์ม) -->
-    <form method="POST" class="inline-block"
-          onsubmit="return confirm('ยืนยันลบโปรไฟล์? จะลบเฉพาะข้อมูลโปรไฟล์ ไม่ลบบัญชีผู้ใช้')">
-      {% csrf_token %}
-      <input type="hidden" name="action" value="delete_profile">
-      <button class="px-4 py-2 rounded-xl ring-1 ring-red-300 text-red-600 hover:bg-red-50">
-        ลบโปรไฟล์
-      </button>
-    </form>
+      {% if profile.profile_picture %}
+        <!-- ปุ่มลบรูป ต้องเป็นฟอร์มแยก (ห้ามซ้อนในฟอร์มหลัก) -->
+        <form method="post" action="{% url 'accounts:profile_remove_image' %}" class="mt-3 flex justify-end">
+          {% csrf_token %}
+          <button type="submit"
+                  class="px-4 py-2 rounded-xl ring-1 ring-red-200 text-red-700 text-sm hover:bg-red-50">
+            ลบรูปโปรไฟล์
+          </button>
+        </form>
+      {% endif %}
+    </div>
   </div>
+
+  <!-- My data -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="bg-white rounded-2xl ring-1 ring-gray-200 p-5">
+      <h3 class="text-base font-semibold text-gray-900">Community ของฉัน</h3>
+      <p class="text-sm text-gray-600 mt-1">โพสต์ล่าสุดของคุณ</p>
+
+      <div class="mt-3 space-y-2">
+        {% if my_posts %}
+          {% for p in my_posts %}
+            <div class="rounded-xl ring-1 ring-gray-200 p-3">
+              <div class="text-sm font-semibold text-gray-900 line-clamp-1">
+                {{ p.title|default:"(ไม่มีหัวข้อ)" }}
+              </div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="rounded-xl bg-gray-50 ring-1 ring-gray-200 p-4 text-sm text-gray-600">ยังไม่มีโพสต์ของคุณ</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="bg-white rounded-2xl ring-1 ring-gray-200 p-5">
+      <h3 class="text-base font-semibold text-gray-900">สูตรอาหารของฉัน</h3>
+      <p class="text-sm text-gray-600 mt-1">สูตรล่าสุดที่คุณสร้าง</p>
+
+      <div class="mt-3 space-y-2">
+        {% if my_recipes %}
+          {% for r in my_recipes %}
+            <div class="rounded-xl ring-1 ring-gray-200 p-3">
+              <div class="text-sm font-semibold text-gray-900 line-clamp-1">{{ r.title }}</div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="rounded-xl bg-gray-50 ring-1 ring-gray-200 p-4 text-sm text-gray-600">ยังไม่มีสูตรของคุณ</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="bg-white rounded-2xl ring-1 ring-gray-200 p-5">
+      <h3 class="text-base font-semibold text-gray-900">เมนูโปรดของฉัน</h3>
+      <p class="text-sm text-gray-600 mt-1">รายการที่คุณบันทึกไว้</p>
+
+      <div class="mt-3 space-y-2">
+        {% if favorite_menus %}
+          {% for m in favorite_menus %}
+            <div class="rounded-xl ring-1 ring-gray-200 p-3">
+              <div class="text-sm font-semibold text-gray-900 line-clamp-1">{{ m.name }}</div>
+              <div class="text-xs text-gray-500 mt-1">
+                {% if m.price %}ราคา: {{ m.price }} บาท{% else %}ไม่มีราคา{% endif %}
+              </div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="rounded-xl bg-gray-50 ring-1 ring-gray-200 p-4 text-sm text-gray-600">ยังไม่มีเมนูโปรดของคุณ</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
 </div>
 {% endblock %}

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}สรุปการใช้จ่าย 7 วัน{% endblock %}
+{% block title %}สรุปการใช้จ่าย{% endblock %}
 
 {% block content %}
 <div class="max-w-6xl mx-auto">
@@ -16,14 +16,14 @@
     </div>
 
     <div class="flex gap-2">
-      <a href="{% url 'budgets:home' %}"
+      <a href="{% url 'budgets:home' %}{% if plan_mode %}?from_plan=1{% endif %}"
          class="px-3 py-2 rounded-xl bg-orange-500 text-white text-sm hover:bg-orange-600">
         ตารางงบรายวัน
       </a>
     </div>
   </div>
 
-  {% if not plan_mode %}
+  {% if not plan_mode and prev_start and next_start %}
     <div class="flex items-center gap-2 mb-4 text-sm">
       <a class="px-3 py-1.5 rounded-lg ring-1 ring-gray-200 hover:bg-gray-50"
          href="{% url 'budgets:weekly_summary' %}?start={{ prev_start|date:'Y-m-d' }}">« สัปดาห์ก่อน</a>

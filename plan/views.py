@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import date, timedelta
 from typing import List, Tuple
 import json, random
+from django.urls import reverse
+
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -92,6 +94,52 @@ def _ensure_session_plan(request):
         }
         request.session.modified = True
     return request.session["plan"]
+
+
+def _normalize_selected_menus(menus):
+    """
+    ทำให้ payload จาก JS เป็นรูปแบบที่ backend ใช้ได้เสมอ
+    และกันข้อมูลพัง (type/field)
+    """
+    if not isinstance(menus, list):
+        return []
+
+    out = []
+    for m in menus:
+        if not isinstance(m, dict):
+            continue
+
+        menu_id = m.get("id")
+        try:
+            menu_id = int(menu_id)
+        except Exception:
+            continue
+
+        meal = (m.get("meal") or "").strip()
+        if not meal:
+            # ถ้าไม่มีมื้อ ถือว่า invalid
+            continue
+
+        # date/day_offset
+        d = m.get("date")
+        day_offset = m.get("day_offset")
+        if day_offset is not None:
+            try:
+                day_offset = int(day_offset)
+            except Exception:
+                day_offset = None
+
+        # key: id|date|meal (ให้ JS ส่งมาก็ได้ แต่ถ้าไม่ส่ง เราสร้างให้)
+        key = (m.get("key") or "").strip()
+        out.append({
+            "id": menu_id,
+            "meal": meal,
+            "date": str(d) if d else "",
+            "day_offset": day_offset,
+            "key": key,  # backend ไม่บังคับ แต่เก็บไว้กันลบผิด
+        })
+
+    return out
 
 
 # ----------------- views -----------------
@@ -208,6 +256,8 @@ def mealplan_summary(request):
         data.append((r, list(menus_qs)))
 
     selected_menus = request.session.get("selected_menus", [])
+    if not isinstance(selected_menus, list):
+        selected_menus = []
 
     used_amount = 0.0
     for m in selected_menus:
@@ -230,13 +280,13 @@ def mealplan_summary(request):
         "used_amount": round(used_amount, 2),
         "remaining_budget": round(remaining_budget, 2),
 
-        # สำคัญ: ส่งให้ dropdown วันในแผนใช้
         "plan_start_date": start_date.isoformat(),
         "plan_days": days,
         "plan_end_date": end_inclusive.isoformat(),
     })
 
 
+# ----------------- SAVE PLAN -----------------
 @login_required
 @require_POST
 def save_plan(request):
@@ -244,14 +294,16 @@ def save_plan(request):
     บันทึกแผนมื้ออาหารจากหน้า summary
     - ล็อกตามงบเฉลี่ยต่อวัน (daily_budget)
     - ถ้าวันไหนเกิน daily_budget -> ไม่ให้บันทึกแผน
+    - ✅ บันทึกเสร็จแล้ว Redirect ไปหน้า Dashboard (budgets:weekly_summary)
     """
 
     # 1) ดึงเมนูที่เลือก
     try:
-        menus = json.loads(request.POST.get("menus", "[]"))
+        raw = json.loads(request.POST.get("menus", "[]"))
     except json.JSONDecodeError:
-        menus = []
+        raw = []
 
+    menus = _normalize_selected_menus(raw)
     if not menus:
         messages.error(request, "กรุณาเลือกเมนูก่อนบันทึกแผน")
         return redirect("plan:summary")
@@ -267,13 +319,11 @@ def save_plan(request):
     daily_budget = _daily_budget(total_budget, days)
     end_date_inclusive = _plan_end_date(start_date, days)
 
-    # 3) ✅ VALIDATE: รวมเงินต่อวันห้ามเกิน daily_budget
-    # ถ้า daily_budget = 0 ให้ผ่าน (เผื่อบางเคสยังไม่กรอกงบ)
+    # 3) VALIDATE: รวมเงินต่อวันห้ามเกิน daily_budget
     if daily_budget > 0:
-        sums = {}  # {date: float}
+        sums = {}  # {date_iso: float}
         for m in menus:
-            menu_id = m.get("id")
-            menu = Menu.objects.filter(pk=menu_id).first()
+            menu = Menu.objects.filter(pk=m["id"]).first()
             if not menu:
                 continue
 
@@ -286,10 +336,10 @@ def save_plan(request):
             key = spend_date.isoformat()
             sums[key] = (sums.get(key, 0.0) + float(menu.price or 0))
 
-        for d, total in sums.items():
+        for d_iso, total in sums.items():
             if total > daily_budget:
                 over = round(total - daily_budget, 2)
-                messages.error(request, f"บันทึกแผนไม่ได้: วันที่ {d} เกินงบเฉลี่ยต่อวัน {over} บาท")
+                messages.error(request, f"บันทึกแผนไม่ได้: วันที่ {d_iso} เกินงบเฉลี่ยต่อวัน {over} บาท")
                 return redirect("plan:summary")
 
     # 4) ลบแผนเก่า (กันซ้ำ)
@@ -337,8 +387,7 @@ def save_plan(request):
 
     # 7) บันทึก BudgetSpend ตามวันจริง
     for m in menus:
-        menu_id = m.get("id")
-        menu = Menu.objects.filter(pk=menu_id).first()
+        menu = Menu.objects.filter(pk=m["id"]).first()
         if not menu:
             continue
 
@@ -348,26 +397,27 @@ def save_plan(request):
         if spend_date > end_date_inclusive:
             spend_date = end_date_inclusive
 
-        meal_label = (m.get("meal") or "").strip()
         BudgetSpend.objects.create(
             user=request.user,
             date=spend_date,
             amount=menu.price,
             menu=menu,
             plan=plan_obj,
-            note=meal_label,
+            note=m["meal"],  # มื้อ
         )
 
     # 8) อัปเดต session
     sess["daily_budget"] = daily_budget
     request.session["plan"] = sess
     request.session["active_plan_id"] = plan_obj.id
-    request.session["selected_menus"] = menus
+    request.session["selected_menus"] = raw
     request.session.modified = True
 
     messages.success(request, "บันทึกแผนเรียบร้อยแล้ว")
-    return redirect("budgets:home")
 
+    # กลับไป "ตารางรายวัน" ก่อน (ตามที่คุณต้องการ)
+    url = reverse("budgets:home")
+    return redirect(f"{url}?from_plan=1")
 
 
 # ----------------- NEW: list plans -----------------

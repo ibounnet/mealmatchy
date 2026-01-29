@@ -1,14 +1,18 @@
+# budgets/urls.py
 from django.urls import path
 from . import views
 
 app_name = "budgets"
 
 urlpatterns = [
-    # ตารางงบรายสัปดาห์ (หน้าแรกของ budgets)
+    # ตารางงบรายสัปดาห์/รายวัน (หน้าแรก budgets)
     path("budget/", views.budget_table, name="home"),
 
-    # Dashboard สรุป 7 วัน
+    # สรุป 7 วัน (แบบเดิม)
     path("budget/summary/", views.weekly_summary, name="weekly_summary"),
+
+    # Dashboard (ไฟล์ใหม่ที่คุณทำไว้)
+    path("dashboard/", views.dashboard, name="dashboard"),
 
     # ตั้ง/แก้งบรายวัน
     path("budget/set/", views.set_daily_budget, name="set_daily"),
@@ -25,7 +29,7 @@ urlpatterns = [
     # ตั้งงบเท่ากันทั้งสัปดาห์
     path("budget/set-week/", views.set_week_same_amount, name="set_week_same_amount"),
 
-    # alias (รองรับโค้ดเก่า/เส้นทางเก่า)
+    # alias (รองรับโค้ดเก่า)
     path("budget/save-expense/", views.save_expense, name="save_expense"),
     path("budget/save-menu-expense/<int:menu_id>/", views.save_menu_expense, name="save_menu_expense"),
 ]

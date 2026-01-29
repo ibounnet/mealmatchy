@@ -12,7 +12,7 @@ urlpatterns = [
 
     path('', RedirectView.as_view(pattern_name='home', permanent=False)),  # หรือ menu_list ถ้าต้องการ
     path('admin/', admin.site.urls),
-    path('accounts/', include('accounts.urls')),
+    path("accounts/", include(("accounts.urls", "accounts"), namespace="accounts")),
     path('menus/', include(('menus.urls', 'menus'), namespace='menus')),
 
     

@@ -40,7 +40,7 @@
                         data-price="{{ m.price }}"
                         data-image="{% if m.image %}{{ m.image.url }}{% endif %}"
                         data-restaurant="{{ r.name }}">
-                  เลือกเมนู
+                  เพิ่มเมนู
                 </button>
               </div>
             </div>
@@ -74,7 +74,6 @@
         <span class="font-bold text-gray-900">{{ daily_budget }} บาท</span>
       </p>
 
-      <!-- ✅ สรุปแบบอิง "วันในแผน" -->
       <p class="text-sm text-gray-700 mt-2">
         ใช้ไปแล้ว (วันนั้น):
         <span id="used-day-text" class="font-bold text-gray-900">0 บาท</span>
@@ -85,7 +84,7 @@
       </p>
 
       <div id="selected-list" class="space-y-3 mb-3">
-        <p class="text-gray-400">ยังไม่ได้เลือกเมนู</p>
+        <p class="text-gray-400">วันนี้ยังไม่ได้เลือกเมนู</p>
       </div>
 
       <form method="post" action="{% url 'plan:save_plan' %}" class="mt-4">
@@ -110,13 +109,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const saveBtn    = document.getElementById("save-btn");
   const errorMsg   = document.getElementById("error-msg");
 
-  const daySelect  = document.getElementById("day-select");
-  const usedDayEl  = document.getElementById("used-day-text");
-  const remainDayEl= document.getElementById("remain-day-text");
+  const daySelect   = document.getElementById("day-select");
+  const usedDayEl   = document.getElementById("used-day-text");
+  const remainDayEl = document.getElementById("remain-day-text");
 
   const DAILY_BUDGET = Number("{{ daily_budget|default:0 }}") || 0;
-
-  const PLAN_START = "{{ plan_start_date|escapejs }}";   // YYYY-MM-DD
+  const PLAN_START = "{{ plan_start_date|escapejs }}";
   const PLAN_DAYS  = Number("{{ plan_days|default:7 }}") || 7;
 
   function pad2(n){ return String(n).padStart(2,'0'); }
@@ -136,6 +134,9 @@ document.addEventListener("DOMContentLoaded", () => {
     if (isNaN(dt.getTime())) return null;
     return dt;
   }
+  function makeKey(id, date, meal){
+    return `${String(id)}|${String(date)}|${String(meal)}`;
+  }
 
   // ---- เติม dropdown วันในแผน ----
   const startDt = safeDateFromISO(PLAN_START) || new Date();
@@ -151,6 +152,11 @@ document.addEventListener("DOMContentLoaded", () => {
     daySelect.appendChild(opt);
   }
 
+  function getActiveDate(){
+    const opt = daySelect.options[daySelect.selectedIndex];
+    return opt ? opt.dataset.date : "";
+  }
+
   // ---- โหลด selected ที่ค้าง ----
   let selectedMenus = [];
   try {
@@ -160,8 +166,16 @@ document.addEventListener("DOMContentLoaded", () => {
     selectedMenus = [];
   }
 
+  // normalize + เติม key ถ้าหาย
+  selectedMenus = selectedMenus.map(m => {
+    const date = String(m.date || "");
+    const meal = String(m.meal || "");
+    const id = String(m.id || "");
+    const key = m.key ? String(m.key) : makeKey(id, date, meal);
+    return {...m, key};
+  });
+
   function sumByDate() {
-    // map: { "YYYY-MM-DD": number }
     const map = {};
     selectedMenus.forEach(m => {
       const d = String(m.date || "");
@@ -173,7 +187,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function anyDayOverBudget() {
-    if (DAILY_BUDGET <= 0) return { over: false, msg: "" }; // ถ้า daily_budget=0 ไม่ล็อก
+    if (DAILY_BUDGET <= 0) return { over: false, msg: "" };
     const map = sumByDate();
     for (const d in map) {
       if (map[d] > DAILY_BUDGET) {
@@ -185,15 +199,20 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function syncLeftButtons() {
+    const activeDate = getActiveDate();
+
     buttons.forEach(btn => {
       const id = String(btn.dataset.id);
-      const found = selectedMenus.find(m => String(m.id) === id);
-      if (found) {
-        btn.textContent = "✓ เลือกแล้ว";
+
+      // ทำให้ปุ่มสะท้อนว่า "วันนี้มีเมนูนี้ถูกเลือกแล้วหรือยัง" (ลดความงง)
+      const foundToday = selectedMenus.some(m => String(m.id) === id && String(m.date) === activeDate);
+
+      if (foundToday) {
+        btn.textContent = "✓ วันนี้เลือกแล้ว";
         btn.classList.remove("bg-orange-500");
         btn.classList.add("bg-green-600");
       } else {
-        btn.textContent = "เลือกเมนู";
+        btn.textContent = "เพิ่มเมนู";
         btn.classList.remove("bg-green-600");
         btn.classList.add("bg-orange-500");
       }
@@ -201,10 +220,8 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function render() {
-    const selectedOpt = daySelect.options[daySelect.selectedIndex];
-    const activeDate = selectedOpt ? selectedOpt.dataset.date : "";
+    const activeDate = getActiveDate();
 
-    // แสดงเฉพาะเมนูของวันที่เลือก
     const todayMenus = activeDate
       ? selectedMenus.filter(m => String(m.date) === activeDate)
       : selectedMenus;
@@ -213,10 +230,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (todayMenus.length === 0) {
       listEl.innerHTML = "<p class='text-gray-400'>วันนี้ยังไม่ได้เลือกเมนู</p>";
     } else {
-      todayMenus.forEach((m, index) => {
-        // index ต้องอิง selectedMenus จริงเพื่อให้ลบถูกตัว
-        const realIndex = selectedMenus.findIndex(x => String(x.id) === String(m.id));
-
+      todayMenus.forEach(m => {
         const card = document.createElement("div");
         card.className = "bg-white shadow-sm rounded-xl ring-1 ring-gray-200 p-3 flex justify-between items-center";
         card.innerHTML = `
@@ -227,7 +241,7 @@ document.addEventListener("DOMContentLoaded", () => {
           </div>
           <button type="button"
                   class="remove-btn text-xs px-2 py-1 rounded-lg bg-red-100 text-red-600 hover:bg-red-200"
-                  data-index="${realIndex}">
+                  data-key="${m.key}">
             ลบ
           </button>
         `;
@@ -235,7 +249,6 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
 
-    // คำนวณ used/remain ของ "วันนั้น"
     const map = sumByDate();
     const usedDay = activeDate ? (map[activeDate] || 0) : 0;
     const remainDay = DAILY_BUDGET - usedDay;
@@ -245,10 +258,8 @@ document.addEventListener("DOMContentLoaded", () => {
     remainDayEl.classList.toggle("text-red-600", remainDay < 0);
     remainDayEl.classList.toggle("text-green-600", remainDay >= 0);
 
-    // ส่ง payload ทั้งหมด
     menusInput.value = JSON.stringify(selectedMenus);
 
-    // ✅ disable save ถ้าวันไหนในทั้งแผนเกินงบเฉลี่ย
     const chk = anyDayOverBudget();
     if (chk.over) {
       saveBtn.disabled = true;
@@ -259,11 +270,10 @@ document.addEventListener("DOMContentLoaded", () => {
       errorMsg.classList.add("hidden");
     }
 
-    // bind remove
     listEl.querySelectorAll(".remove-btn").forEach(btn => {
       btn.addEventListener("click", () => {
-        const idx = Number(btn.dataset.index);
-        if (idx >= 0) selectedMenus.splice(idx, 1);
+        const key = String(btn.dataset.key || "");
+        selectedMenus = selectedMenus.filter(m => String(m.key) !== key);
         render();
         syncLeftButtons();
       });
@@ -282,15 +292,17 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      const selectedOpt = daySelect.options[daySelect.selectedIndex];
       const dayOffset = Number(daySelect.value);
-      const selectedDate = selectedOpt ? selectedOpt.dataset.date : "";
+      const selectedDate = getActiveDate();
       if (!selectedDate) {
         alert("กรุณาเลือกวันในแผนก่อน");
         return;
       }
 
+      const key = makeKey(id, selectedDate, meal);
+
       const menu = {
+        key: key,
         id: id,
         name: btn.dataset.name,
         price: Number(btn.dataset.price || 0),
@@ -301,8 +313,8 @@ document.addEventListener("DOMContentLoaded", () => {
         date: selectedDate,
       };
 
-      // toggle
-      const idx = selectedMenus.findIndex(m => String(m.id) === id);
+      // toggle แบบถูกต้อง: id+date+meal
+      const idx = selectedMenus.findIndex(m => String(m.key) === key);
       if (idx >= 0) selectedMenus.splice(idx, 1);
       else selectedMenus.push(menu);
 
@@ -311,7 +323,10 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  daySelect.addEventListener("change", render);
+  daySelect.addEventListener("change", () => {
+    render();
+    syncLeftButtons();
+  });
 
   render();
   syncLeftButtons();
