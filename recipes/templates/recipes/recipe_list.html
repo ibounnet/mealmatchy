@@ -1,117 +1,226 @@
 {% extends "base.html" %}
-{% load static %}
-
-{% block title %}รวมสูตรอาหาร{% endblock %}
+{% block title %}{% if mine_only %}สูตรของฉัน{% else %}รวมสูตรอาหาร{% endif %}{% endblock %}
 
 {% block content %}
-<div class="max-w-6xl mx-auto py-8">
+<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
-  {# ปุ่มบนหัวข้อ #}
-  <div class="flex items-center justify-between mb-6">
-    <h1 class="text-3xl font-bold">รวมสูตรอาหาร</h1>
+  <!-- Header -->
+  <div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+    <div>
+      <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900">
+        {% if mine_only %}สูตรของฉัน{% else %}รวมสูตรอาหาร{% endif %}
+      </h1>
+      <p class="mt-1 text-sm text-gray-500">
+        ค้นหา เปรียบเทียบต้นทุน/เสิร์ฟ และเลือกสูตรที่คุ้มค่ากับงบของคุณ
+      </p>
+    </div>
 
-    <div class="flex gap-3">
-      {# ปุ่มสูตรทั้งหมด #}
+    <div class="flex flex-wrap gap-2">
       <a href="{% url 'recipes:list' %}"
-         class="px-4 py-2 rounded-xl text-sm
-                {% if not only_mine %}
-                  bg-primary text-white hover:bg-primary-dark
-                {% else %}
-                  bg-white text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50
-                {% endif %}">
+         class="{% if not mine_only %}bg-orange-600 text-white{% else %}bg-white text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50{% endif %} px-4 py-2 rounded-xl text-sm font-semibold transition">
         สูตรทั้งหมด
       </a>
 
-      {# ปุ่มสูตรของฉัน #}
-      <a href="{% url 'recipes:list' %}?mine=1"
-         class="px-4 py-2 rounded-xl text-sm
-                {% if only_mine %}
-                  bg-primary text-white hover:bg-primary-dark
-                {% else %}
-                  bg-white text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50
-                {% endif %}">
+      <a href="{% url 'recipes:mine' %}"
+         class="{% if mine_only %}bg-orange-600 text-white{% else %}bg-white text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50{% endif %} px-4 py-2 rounded-xl text-sm font-semibold transition">
         สูตรของฉัน
       </a>
 
-      <a href="{% url 'recipes:add' %}"
-         class="px-4 py-2 rounded-xl bg-primary text-white text-sm hover:bg-primary-dark">
-        เพิ่มสูตรอาหาร
-      </a>
+      {% if request.user.is_authenticated %}
+        <a href="{% url 'recipes:add' %}"
+           class="bg-orange-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-orange-700 transition">
+          เพิ่มสูตรอาหาร
+        </a>
+      {% endif %}
     </div>
   </div>
 
-  {% if recipes %}
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-      {% for r in recipes %}
-        <div class="bg-white rounded-2xl shadow-card border border-gray-200 overflow-hidden flex flex-col">
+  <!-- Filters -->
+  <div class="mt-6 bg-white rounded-2xl ring-1 ring-gray-200 shadow-sm p-4 sm:p-5">
+    <form method="get" class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+      <div class="md:col-span-6">
+        <label class="text-xs font-semibold text-gray-700">ค้นหา</label>
+        <input type="text" name="q" value="{{ q }}"
+               placeholder="ค้นหาชื่อสูตรหรือคำอธิบาย เช่น กะเพรา, ต้มยำ..."
+               class="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm
+                      focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent">
+      </div>
 
-          {# รูปภาพ #}
-          <a href="{% url 'recipes:detail' r.id %}">
-            {% if r.image %}
-              <img src="{{ r.image.url }}" alt="{{ r.title }}"
-                   class="w-full h-48 object-cover">
-            {% else %}
-              <div class="w-full h-48 bg-gray-100 flex items-center justify-center text-gray-400 text-sm">
-                ไม่มีรูป
-              </div>
-            {% endif %}
+      <div class="md:col-span-3">
+        <label class="text-xs font-semibold text-gray-700">เรียงลำดับ</label>
+        <select name="sort"
+                class="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm
+                       focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent">
+          <option value="new" {% if sort == "new" %}selected{% endif %}>ใหม่ล่าสุด</option>
+          <option value="old" {% if sort == "old" %}selected{% endif %}>เก่าสุด</option>
+          <option value="cost_low" {% if sort == "cost_low" %}selected{% endif %}>ต้นทุน/เสิร์ฟ ต่ำ → สูง</option>
+          <option value="cost_high" {% if sort == "cost_high" %}selected{% endif %}>ต้นทุน/เสิร์ฟ สูง → ต่ำ</option>
+          <option value="time_low" {% if sort == "time_low" %}selected{% endif %}>เวลารวม น้อย → มาก</option>
+          <option value="time_high" {% if sort == "time_high" %}selected{% endif %}>เวลารวม มาก → น้อย</option>
+        </select>
+      </div>
+
+      <div class="md:col-span-3 flex flex-col gap-2">
+        <label class="inline-flex items-center gap-2 text-sm text-gray-700 select-none">
+          <input type="hidden" name="hide_zero" value="0">
+          <input type="checkbox" name="hide_zero" value="1" {% if hide_zero == "1" %}checked{% endif %}
+                 class="rounded border-gray-300 text-orange-600 focus:ring-orange-500">
+          ซ่อนสูตรที่ต้นทุน/เสิร์ฟ = 0
+        </label>
+
+        <div class="flex gap-2">
+          <button type="submit"
+                  class="flex-1 bg-orange-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-orange-700 transition">
+            ค้นหา
+          </button>
+
+          <a href="{% if mine_only %}{% url 'recipes:mine' %}{% else %}{% url 'recipes:list' %}{% endif %}"
+             class="px-4 py-2 rounded-xl text-sm font-semibold ring-1 ring-gray-200 hover:bg-gray-50 transition">
+            ล้าง
           </a>
+        </div>
+      </div>
+    </form>
+  </div>
 
-          {# เนื้อหาในการ์ด #}
-          <div class="p-4 flex-1 flex flex-col justify-between space-y-2">
-            <div class="space-y-1">
-              <a href="{% url 'recipes:detail' r.id %}"
-                 class="block text-base font-semibold text-gray-900 hover:text-orange-600">
-                {{ r.title }}
-              </a>
-
-              <p class="text-sm text-gray-600 line-clamp-2">
-                {{ r.description|default:"ไม่มีคำอธิบาย" }}
-              </p>
-
-              {# เวลาเตรียม / เวลาปรุง #}
-              <p class="text-xs text-gray-500">
-                เวลาเตรียม {{ r.prep_minutes|default:0 }} นาที ·
-                เวลาปรุง {{ r.cook_minutes|default:0 }} นาที ·
-                รวม {{ r.prep_minutes|default:0|add:r.cook_minutes|default:0 }} นาที
-              </p>
-            </div>
-
-            <div class="flex items-center justify-between text-[11px] text-gray-500">
-              <div>
-                {% if r.created_by %}
-                  สร้างโดย: {{ r.created_by.username }}
+  <!-- Grid -->
+  <div class="mt-6">
+    {% if page_obj.object_list %}
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {% for item in page_obj.object_list %}
+          {% with r=item.recipe %}
+          <div class="group bg-white rounded-2xl ring-1 ring-gray-200 shadow-sm overflow-hidden hover:shadow-md transition">
+            <a href="{% url 'recipes:detail' r.id %}" class="block">
+              <div class="aspect-[16/10] bg-gray-50 overflow-hidden">
+                {% if r.image %}
+                  <img src="{{ r.image.url }}" alt="{{ r.title }}"
+                       class="w-full h-full object-cover group-hover:scale-[1.03] transition duration-300">
+                {% else %}
+                  <div class="w-full h-full flex items-center justify-center text-sm text-gray-400">
+                    ไม่มีรูปภาพ
+                  </div>
                 {% endif %}
-                {% if r.created_at %}
-                  • {{ r.created_at|date:"d/m/Y" }}
+              </div>
+            </a>
+
+            <div class="p-4">
+              <div class="flex items-start justify-between gap-3">
+                <a href="{% url 'recipes:detail' r.id %}" class="min-w-0">
+                  <h3 class="text-base font-bold text-gray-900 truncate">
+                    {{ r.title }}
+                  </h3>
+                  <p class="mt-1 text-xs text-gray-500 line-clamp-2">
+                    {{ r.description|default:"ไม่มีคำอธิบาย" }}
+                  </p>
+                </a>
+
+                <div class="shrink-0 text-right">
+                  <div class="text-xs text-gray-500">ต้นทุน/เสิร์ฟ</div>
+                  {% if item.cost_per_serving > 0 %}
+                    <div class="text-sm font-bold text-orange-700">{{ item.cost_per_serving }} ฿</div>
+                  {% else %}
+                    <div class="text-sm font-bold text-gray-400">-</div>
+                  {% endif %}
+                </div>
+              </div>
+
+              <div class="mt-3 flex flex-wrap gap-2 text-[11px]">
+                <span class="px-2 py-1 rounded-full bg-orange-50 text-orange-700 ring-1 ring-orange-200">
+                  รวม {{ item.total_minutes }} นาที
+                </span>
+                <span class="px-2 py-1 rounded-full bg-gray-50 text-gray-700 ring-1 ring-gray-200">
+                  {{ item.servings }} เสิร์ฟ
+                </span>
+                {% if item.total_cost > 0 %}
+                  <span class="px-2 py-1 rounded-full bg-gray-50 text-gray-700 ring-1 ring-gray-200">
+                    รวม {{ item.total_cost }} ฿
+                  </span>
                 {% endif %}
               </div>
 
-              {% if request.user.is_staff or r.created_by_id == request.user.id %}
-                <div class="flex gap-3 text-xs">
-                  <a href="{% url 'recipes:edit' r.id %}"
-                     class="text-orange-600 hover:underline">
-                    แก้ไข
+              <div class="mt-4 flex items-center justify-between">
+                <div class="text-[11px] text-gray-500">
+                  {{ r.created_at|date:"d/m/Y" }}
+                  {% if r.created_by %} · {{ r.created_by.username }}{% endif %}
+                </div>
+
+                <div class="flex items-center gap-2">
+                  <a href="{% url 'recipes:detail' r.id %}"
+                     class="text-sm font-semibold text-orange-700 hover:text-orange-800">
+                    ดูรายละเอียด
                   </a>
 
-                  <form method="post"
-                        action="{% url 'recipes:delete' r.id %}"
-                        onsubmit="return confirm('ยืนยันลบสูตรอาหารนี้หรือไม่');">
-                    {% csrf_token %}
-                    <button type="submit"
-                            class="text-red-600 hover:underline">
-                      ลบ
-                    </button>
-                  </form>
+                  {% if request.user.is_authenticated and r.created_by_id == request.user.id %}
+                    <a href="{% url 'recipes:edit' r.id %}"
+                       class="text-xs px-2 py-1 rounded-lg ring-1 ring-gray-200 hover:bg-gray-50">
+                      แก้ไข
+                    </a>
+                    <form method="post" action="{% url 'recipes:delete' r.id %}">
+                      {% csrf_token %}
+                      <button type="submit"
+                              class="text-xs px-2 py-1 rounded-lg bg-red-50 text-red-700 hover:bg-red-100">
+                        ลบ
+                      </button>
+                    </form>
+                  {% endif %}
                 </div>
-              {% endif %}
+              </div>
             </div>
           </div>
+          {% endwith %}
+        {% endfor %}
+      </div>
+
+      <!-- Pagination -->
+      {% if is_paginated %}
+        <div class="mt-8 flex items-center justify-center gap-2">
+          {% if page_obj.has_previous %}
+            <a class="px-3 py-2 rounded-xl ring-1 ring-gray-200 hover:bg-gray-50 text-sm"
+               href="?q={{ q|urlencode }}&sort={{ sort }}&hide_zero={{ hide_zero }}&page={{ page_obj.previous_page_number }}">
+              ก่อนหน้า
+            </a>
+          {% else %}
+            <span class="px-3 py-2 rounded-xl ring-1 ring-gray-100 text-gray-300 text-sm">ก่อนหน้า</span>
+          {% endif %}
+
+          <span class="px-3 py-2 rounded-xl bg-gray-50 ring-1 ring-gray-200 text-sm text-gray-700">
+            หน้า {{ page_obj.number }} / {{ paginator.num_pages }}
+          </span>
+
+          {% if page_obj.has_next %}
+            <a class="px-3 py-2 rounded-xl ring-1 ring-gray-200 hover:bg-gray-50 text-sm"
+               href="?q={{ q|urlencode }}&sort={{ sort }}&hide_zero={{ hide_zero }}&page={{ page_obj.next_page_number }}">
+              ถัดไป
+            </a>
+          {% else %}
+            <span class="px-3 py-2 rounded-xl ring-1 ring-gray-100 text-gray-300 text-sm">ถัดไป</span>
+          {% endif %}
         </div>
-      {% endfor %}
-    </div>
-  {% else %}
-    <p class="text-gray-500">ยังไม่มีสูตรอาหาร</p>
-  {% endif %}
+      {% endif %}
+
+    {% else %}
+      <div class="mt-8 bg-white rounded-2xl ring-1 ring-gray-200 shadow-sm p-8 text-center">
+        <div class="text-lg font-bold text-gray-900">ไม่พบสูตรอาหาร</div>
+        <div class="mt-2 text-sm text-gray-500">
+          ลองเปลี่ยนคำค้นหา หรือปิดตัวเลือก “ซ่อนสูตรต้นทุน 0” แล้วลองใหม่
+        </div>
+
+        <div class="mt-5 flex flex-wrap justify-center gap-2">
+          <a href="{% if mine_only %}{% url 'recipes:mine' %}{% else %}{% url 'recipes:list' %}{% endif %}"
+             class="px-4 py-2 rounded-xl ring-1 ring-gray-200 hover:bg-gray-50 text-sm font-semibold">
+            ล้างตัวกรอง
+          </a>
+
+          {% if request.user.is_authenticated %}
+            <a href="{% url 'recipes:add' %}"
+               class="px-4 py-2 rounded-xl bg-orange-600 text-white hover:bg-orange-700 text-sm font-semibold">
+              เพิ่มสูตรอาหาร
+            </a>
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
+  </div>
+
 </div>
 {% endblock %}

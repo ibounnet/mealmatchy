@@ -1,20 +1,31 @@
 {% extends 'base.html' %}
 {% block title %}หน้าแรก - MealMatchy{% endblock %}
-
 {% block content %}
 
 <!-- ปุ่มเริ่มวางแผนมื้ออาหาร -->
 <div class="flex items-center justify-center my-8">
-  <button id="openPlanModal"
-          class="inline-flex items-center gap-3 px-8 py-4 rounded-2xl bg-primary text-white hover:bg-primary-dark shadow-lg text-lg font-bold">
-    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M6 2a1 1 0 0 1 1 1v1h10V3a1 1 0 1 1 2 0v1h1a2 2 0 0 1 2 2v3H1V6a2 2 0 0 1 2-2h1V3a1 1 0 1 1 2 0v1zM1 11h22v9a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2v-9zm7 3H6v2h2v-2z"/>
-    </svg>
-    เริ่มวางแผนมื้ออาหารเลย
-  </button>
+  {% if user.is_authenticated %}
+    <button id="openPlanModal"
+            type="button"
+            class="inline-flex items-center gap-3 px-8 py-4 rounded-2xl bg-primary text-white hover:bg-primary-dark shadow-lg text-lg font-bold">
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M6 2a1 1 0 0 1 1 1v1h10V3a1 1 0 1 1 2 0v1h1a2 2 0 0 1 2 2v3H1V6a2 2 0 0 1 2-2h1V3a1 1 0 1 1 2 0v1zM1 11h22v9a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2v-9zm7 3H6v2h2v-2z"/>
+      </svg>
+      เริ่มวางแผนมื้ออาหารเลย
+    </button>
+  {% else %}
+    <a href="{% url 'accounts:login' %}?next=/"
+       class="inline-flex items-center gap-3 px-8 py-4 rounded-2xl bg-primary text-white hover:bg-primary-dark shadow-lg text-lg font-bold">
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M6 2a1 1 0 0 1 1 1v1h10V3a1 1 0 1 1 2 0v1h1a2 2 0 0 1 2 2v3H1V6a2 2 0 0 1 2-2h1V3a1 1 0 1 1 2 0v1zM1 11h22v9a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2v-9zm7 3H6v2h2v-2z"/>
+      </svg>
+      เริ่มวางแผนมื้ออาหารเลย
+    </a>
+    <p class="text-xs text-gray-500 text-center mt-2">เข้าสู่ระบบก่อนเพื่อสร้างแผนและบันทึกข้อมูล</p>
+  {% endif %}
 </div>
 
-<!-- ✅ Search Bar (ศูนย์กลาง) : ใต้ปุ่มวางแผน -->
+<!-- Search Bar -->
 <div class="max-w-6xl mx-auto -mt-2 mb-6">
   <form action="{% url 'searches:search' %}" method="get" class="max-w-3xl mx-auto">
     <div class="bg-white rounded-2xl shadow-sm ring-1 ring-gray-200 p-3 flex flex-col md:flex-row gap-3">
@@ -63,9 +74,7 @@
   <div class="max-w-6xl mx-auto mb-6">
     <div class="bg-yellow-50 ring-1 ring-yellow-200 rounded-2xl p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
       <div>
-        <div class="text-sm font-semibold text-yellow-900">
-          วันนี้ยังทำไม่ครบมื้อ
-        </div>
+        <div class="text-sm font-semibold text-yellow-900">วันนี้ยังทำไม่ครบมื้อ</div>
         <div class="text-sm text-yellow-800 mt-1">
           ขาด: {{ today_meal_status.missing_labels|join:", " }}
           (ทำแล้ว {{ today_meal_status.done_count }}/{{ today_meal_status.total }})
@@ -83,18 +92,15 @@
 <!-- เมนูแนะนำในงบ -->
 <div class="max-w-6xl mx-auto">
   <div class="flex items-center justify-between mb-2">
-    <h2 class="text-lg font-semibold text-gray-800">
-      เมนูแนะนำในงบ (Budget Menu Highlight)
-    </h2>
-    <p class="text-xs text-gray-500">
-      แสดงเมนูราคาไม่เกิน {{ budget }} บาท
-    </p>
+    <h2 class="text-lg font-semibold text-gray-800">เมนูแนะนำในงบ (Budget Menu Highlight)</h2>
+    <p class="text-xs text-gray-500">แสดงเมนูราคาไม่เกิน {{ budget }} บาท</p>
   </div>
 
   {% if menus %}
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
       {% for m in menus %}
-        <div class="bg-white rounded-2xl ring-1 ring-gray-100 shadow-sm overflow-hidden">
+        <a href="{% url 'menus:menu_detail' m.id %}"
+           class="bg-white rounded-2xl ring-1 ring-gray-100 shadow-sm overflow-hidden hover:shadow-md transition block">
           {% if m.image %}
             <img src="{{ m.image.url }}" alt="{{ m.name }}" class="w-full h-44 object-cover">
           {% else %}
@@ -102,18 +108,22 @@
               ไม่มีรูป
             </div>
           {% endif %}
+
           <div class="p-4 space-y-1">
             <div class="text-xs text-gray-500">
-              ร้าน: {{ m.restaurant_name|default:"-" }}
+              ร้าน:
+              {% if m.restaurant_name %}
+                {{ m.restaurant_name }}
+              {% elif m.restaurant %}
+                {{ m.restaurant.name }}
+              {% else %}
+                -
+              {% endif %}
             </div>
-            <div class="font-semibold text-gray-900">
-              {{ m.name }}
-            </div>
-            <div class="text-sm text-primary-dark font-bold">
-              {{ m.price }} บาท
-            </div>
+            <div class="font-semibold text-gray-900">{{ m.name }}</div>
+            <div class="text-sm text-primary-dark font-bold">{{ m.price }} บาท</div>
           </div>
-        </div>
+        </a>
       {% endfor %}
     </div>
   {% else %}
@@ -125,9 +135,7 @@
 <div class="max-w-6xl mx-auto mt-12">
   <div class="bg-white rounded-2xl ring-1 ring-gray-100 shadow-sm p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
     <div>
-      <h2 class="text-lg font-semibold text-gray-800">
-        คอมมูนิตี้ของคุณ จาก Community ของ MealMatchy
-      </h2>
+      <h2 class="text-lg font-semibold text-gray-800">คอมมูนิตี้ของคุณ จาก Community ของ MealMatchy</h2>
       <p class="text-sm text-gray-600 mt-1">
         พื้นที่แชร์เมนูสุดคุ้ม รีวิวร้านอาหารใกล้มหาลัย และไลฟ์สไตล์คนงบน้อยแบบจริงจัง
       </p>
@@ -140,9 +148,10 @@
   </div>
 </div>
 
-<!-- MODAL: เริ่มวางแผน -->
+{% if user.is_authenticated %}
+<!-- MODAL: เริ่มวางแผน (แสดงเฉพาะตอน login แล้ว) -->
 <div id="planModal" class="fixed inset-0 z-50 hidden">
-  <div class="absolute inset-0 bg-black/40" aria-hidden="true"></div>
+  <div id="planOverlay" class="absolute inset-0 bg-black/40" aria-hidden="true"></div>
 
   <div class="relative max-w-lg mx-auto mt-16 bg-white rounded-2xl shadow-xl ring-1 ring-gray-100 p-8">
     <div class="text-center mb-6">
@@ -194,6 +203,7 @@
   (function () {
     const openBtn   = document.getElementById('openPlanModal');
     const modal     = document.getElementById('planModal');
+    const overlay   = document.getElementById('planOverlay');
     const closeBtn  = document.getElementById('closePlanModal');
     const dayBtns   = document.querySelectorAll('.day-btn');
     const daysField = document.getElementById('daysField');
@@ -204,17 +214,17 @@
 
     openBtn?.addEventListener('click', openModal);
     closeBtn?.addEventListener('click', closeModal);
-    modal?.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+    overlay?.addEventListener('click', closeModal);
 
     dayBtns.forEach(btn => {
       btn.addEventListener('click', () => {
         const v = btn.getAttribute('data-days') || '1';
         daysField.value = v;
-        dayBtns.forEach(b => b.classList.remove('bg-primary','text-white','ring-primary'));
-        btn.classList.add('bg-primary','text-white','ring-primary');
+        dayBtns.forEach(b => b.classList.remove('bg-primary','text-white'));
+        btn.classList.add('bg-primary','text-white');
       });
     });
-    dayBtns[0]?.classList.add('bg-primary','text-white','ring-primary');
+    dayBtns[0]?.classList.add('bg-primary','text-white');
 
     const t = new Date();
     const iso = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
@@ -222,5 +232,6 @@
     startDate.value = iso;
   })();
 </script>
+{% endif %}
 
 {% endblock %}

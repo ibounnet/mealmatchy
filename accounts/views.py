@@ -4,7 +4,9 @@ from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
-from django.apps import apps
+
+from menus.models import Menu
+from budgets.models import MealPlan, BudgetSpend
 
 from .forms import (
     CustomUserCreationForm,
@@ -13,9 +15,6 @@ from .forms import (
     LoginForm,
 )
 from .models import Profile
-
-from menus.models import Menu
-from budgets.models import MealPlan, BudgetSpend
 
 MEAL_LABELS = ["มื้อเช้า", "มื้อเที่ยง", "มื้อเย็น"]
 
@@ -42,41 +41,27 @@ def _meal_status_for_date(user, the_date, plan=None):
     }
 
 
-def _detect_user_field(Model):
-    """หา field ที่เป็นเจ้าของข้อมูลในโมเดลแบบยืดหยุ่น"""
-    if not Model:
-        return None
-
-    candidate_names = ["user", "author", "created_by", "owner", "created_user", "posted_by"]
-    model_fields = {f.name for f in Model._meta.get_fields()}
-
-    for name in candidate_names:
-        if name in model_fields:
-            return name
-    return None
-
-
-def _find_model_by_names(model_names):
-    """
-    ค้นหาโมเดลจากชื่อโมเดลโดยไม่ยึด app_label
-    เช่น ["Post","CommunityPost"] -> เจออันแรกที่มีจริงในโปรเจกต์
-    """
-    model_names_lower = {m.lower() for m in model_names}
-    for m in apps.get_models():
-        if m.__name__.lower() in model_names_lower:
-            return m
-    return None
-
-
 def home_view(request):
+    # budget filter (default 50)
     try:
         budget = int(request.GET.get("budget", 50))
     except (TypeError, ValueError):
         budget = 50
 
-    menus = Menu.objects.filter(price__lte=budget).order_by("-created_at")[:12]
+    # highlight menus
+    menus = (
+        Menu.objects
+        .filter(price__lte=budget)
+        .select_related("restaurant")  # ถ้า restaurant เป็น FK
+        .order_by("-created_at")[:12]
+    )
 
-    ctx = {"budget": budget, "menus": menus, "today_meal_status": None, "today_date": None}
+    ctx = {
+        "budget": budget,
+        "menus": menus,
+        "today_meal_status": None,
+        "today_date": None,
+    }
 
     if request.user.is_authenticated:
         today = timezone.localdate()
@@ -95,7 +80,23 @@ def home_view(request):
     return render(request, "accounts/home.html", ctx)
 
 
-# ====================== AUTH ======================
+def login_view(request):
+    """
+    รองรับ ?next=... เพื่อกลับหน้าที่ผู้ใช้ต้องการหลังล็อกอิน
+    """
+    next_url = request.GET.get("next") or request.POST.get("next") or ""
+
+    if request.method == "POST":
+        form = LoginForm(request, data=request.POST)
+        if form.is_valid():
+            login(request, form.get_user())
+            return redirect(next_url or "home")
+        messages.error(request, "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง")
+    else:
+        form = LoginForm(request)
+
+    return render(request, "accounts/login.html", {"form": form, "next": next_url})
+
 
 def register_view(request):
     if request.method == "POST":
@@ -111,23 +112,9 @@ def register_view(request):
     return render(request, "accounts/register.html", {"form": form})
 
 
-def login_view(request):
-    if request.method == "POST":
-        form = LoginForm(request, data=request.POST)
-        if form.is_valid():
-            login(request, form.get_user())
-            return redirect("home")
-        messages.error(request, "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง")
-    else:
-        form = LoginForm(request)
-
-    return render(request, "accounts/login.html", {"form": form})
-
-
 def logout_view(request):
     logout(request)
-    return redirect("accounts:login")
-
+    return redirect("home")
 
 # ====================== PROFILE ======================
 

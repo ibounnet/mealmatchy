@@ -12,7 +12,7 @@ urlpatterns = [
 
     path('', RedirectView.as_view(pattern_name='home', permanent=False)),  # หรือ menu_list ถ้าต้องการ
     path('admin/', admin.site.urls),
-    path("accounts/", include(("accounts.urls", "accounts"), namespace="accounts")),
+     path("accounts/", include("accounts.urls", namespace="accounts")),
     path('menus/', include(('menus.urls', 'menus'), namespace='menus')),
 
     
@@ -23,7 +23,7 @@ urlpatterns = [
     path('recipes/', include(('recipes.urls', 'recipes'), namespace='recipes')),
     path('restaurants/', include(('restaurants.urls', 'restaurants'), namespace='restaurants')),
     path('community/', include(('community.urls', 'community'), namespace='community')),
-
+    
 
     path('register/', RedirectView.as_view(pattern_name='register', permanent=False)),
     path('login/',    RedirectView.as_view(pattern_name='login', permanent=False)),

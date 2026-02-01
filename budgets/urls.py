@@ -32,4 +32,8 @@ urlpatterns = [
     # alias (รองรับโค้ดเก่า)
     path("budget/save-expense/", views.save_expense, name="save_expense"),
     path("budget/save-menu-expense/<int:menu_id>/", views.save_menu_expense, name="save_menu_expense"),
+
+    path("recipe/add/<int:recipe_id>/", views.add_recipe_to_day, name="add_recipe_to_day"),
 ]
+
+

@@ -2,6 +2,8 @@
 import json
 from decimal import Decimal, ROUND_HALF_UP
 
+from django.core.paginator import Paginator
+from django.db.models import Q
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect, get_object_or_404
@@ -211,11 +213,84 @@ def cost_settings(request):
         "next": next_url,
     })
 
+def _cost_per_serving_decimal(recipe: Recipe) -> Decimal:
+    servings = max(int(recipe.servings or 1), 1)
+    total = (recipe.total_cost or Decimal("0"))
+    return (total / Decimal(servings)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
 
 @login_required
-def recipe_list(request):
-    qs = Recipe.objects.order_by("-created_at")
-    return render(request, "recipes/recipe_list.html", {"recipes": qs})
+def recipe_list(request, mine_only=False):
+    mine_only = bool(mine_only)
+
+    q = (request.GET.get("q") or "").strip()
+    sort = (request.GET.get("sort") or "new").strip()
+    hide_zero = (request.GET.get("hide_zero") or "0").strip()  # "1" = hide
+
+    qs = Recipe.objects.all()
+
+    # ✅ สูตรของฉัน (รองรับชื่อ field ผู้สร้างหลายแบบ)
+    if mine_only:
+        if hasattr(Recipe, "created_by"):
+            qs = qs.filter(created_by=request.user)
+        elif hasattr(Recipe, "author"):
+            qs = qs.filter(author=request.user)
+
+    # ✅ search
+    if q:
+        qs = qs.filter(Q(title__icontains=q) | Q(description__icontains=q))
+
+    qs = qs.order_by("-created_at")
+
+    # ✅ build items for template (คำนวณ cost/time)
+    items = []
+    for r in qs:
+        cost_per_serving = _cost_per_serving_decimal(r)
+
+        # ✅ ซ่อนสูตรต้นทุน/เสิร์ฟ = 0 ตามอาจารย์
+        if hide_zero == "1" and cost_per_serving <= 0:
+            continue
+
+        total_minutes = int((r.prep_minutes or 0) + (r.cook_minutes or 0))
+        items.append({
+            "recipe": r,
+            "cost_per_serving": float(cost_per_serving),
+            "total_minutes": total_minutes,
+            "servings": int(r.servings or 1),
+            "total_cost": float((r.total_cost or Decimal("0")).quantize(Decimal("0.01"))),
+        })
+
+    # ✅ sorting (ทำใน python เพราะ item เป็น dict)
+    if sort == "old":
+        items.sort(key=lambda x: x["recipe"].created_at)
+    elif sort == "cost_low":
+        items.sort(key=lambda x: (0 if x["cost_per_serving"] > 0 else 1, x["cost_per_serving"]))
+    elif sort == "cost_high":
+        items.sort(key=lambda x: (0 if x["cost_per_serving"] > 0 else 1, -x["cost_per_serving"]))
+    elif sort == "time_low":
+        items.sort(key=lambda x: x["total_minutes"])
+    elif sort == "time_high":
+        items.sort(key=lambda x: -x["total_minutes"])
+    else:
+        # new
+        items.sort(key=lambda x: x["recipe"].created_at, reverse=True)
+
+    # ✅ pagination
+    paginator = Paginator(items, 9)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    return render(request, "recipes/recipe_list.html", {
+        "mine_only": mine_only,
+        "q": q,
+        "sort": sort,
+        "hide_zero": hide_zero,
+
+        "page_obj": page_obj,
+        "paginator": paginator,
+        "is_paginated": page_obj.has_other_pages(),
+    })
+
 
 
 @login_required

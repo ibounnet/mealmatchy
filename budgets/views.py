@@ -7,7 +7,6 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Sum, Q, Count
 from django.shortcuts import render, redirect, get_object_or_404
-from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
@@ -96,8 +95,47 @@ def filter_by_plan(qs, plan: dict | None):
     return qs.distinct()
 
 
+def _plan_end_date(start: date, days: int) -> date:
+    if not start:
+        start = timezone.localdate()
+    if not days or days <= 0:
+        days = 1
+    return start + timedelta(days=days - 1)
+
+
 # ----------------- helpers -----------------
 MEAL_LABELS = ["มื้อเช้า", "มื้อเที่ยง", "มื้อเย็น"]
+
+
+def _meal_status_from_spends(spends):
+    required = MEAL_LABELS
+    got = set()
+    for s in spends:
+        note = (getattr(s, "note", "") or "").strip()
+        if note in required:
+            got.add(note)
+
+    missing = [m for m in required if m not in got]
+    if len(got) == 0:
+        return {
+            "badge_text": "ยังไม่เริ่ม",
+            "badge_class": "bg-gray-50 text-gray-700 ring-gray-200",
+            "missing_labels": required,
+            "is_complete": False,
+        }
+    if len(missing) == 0:
+        return {
+            "badge_text": "ครบ 3/3",
+            "badge_class": "bg-green-50 text-green-700 ring-green-200",
+            "missing_labels": [],
+            "is_complete": True,
+        }
+    return {
+        "badge_text": f"ค้าง {len(missing)}/3",
+        "badge_class": "bg-yellow-50 text-yellow-800 ring-yellow-200",
+        "missing_labels": missing,
+        "is_complete": False,
+    }
 
 
 def _monday(d: date) -> date:
@@ -114,6 +152,18 @@ def _parse_date_or_today(date_str: str | None) -> date:
 
 
 def _get_active_plan(request) -> Optional[MealPlan]:
+    """
+    priority 1: plan_id ใน query (เช่น มาจากปุ่มดูรายละเอียด/ดูแผน)
+    priority 2: active_plan_id ใน session
+    """
+    plan_id = request.GET.get("plan_id")
+    if plan_id:
+        try:
+            pid = int(plan_id)
+            return MealPlan.objects.filter(id=pid, user=request.user).first()
+        except Exception:
+            return None
+
     plan_id = request.session.get("active_plan_id")
     if not plan_id:
         return None
@@ -199,11 +249,11 @@ def _tokens_from_menu_name(name: str) -> list[str]:
 
 def _recipe_cost_per_serving(recipe: Recipe) -> float:
     try:
-        total = float(recipe.total_cost or 0)
+        total = float(getattr(recipe, "total_cost", 0) or 0)
     except Exception:
         total = 0.0
     try:
-        servings = int(recipe.servings or 1)
+        servings = int(getattr(recipe, "servings", 1) or 1)
     except Exception:
         servings = 1
     if servings <= 0:
@@ -217,6 +267,12 @@ def _build_recipe_matches(
     remain: float,
     limit: int = 8,
 ) -> List[Dict[str, Any]]:
+    """
+    แนะนำสูตรอาหารจากเมนูที่กินในวันนั้น แล้วเทียบต้นทุนต่อเสิร์ฟ
+
+    เงื่อนไขสำคัญตามอาจารย์:
+    - ไม่แสดงสูตรที่ต้นทุน/เสิร์ฟ <= 0 (เพราะเทียบไม่ได้และทำให้เข้าใจผิด)
+    """
     menu_spends: List[Tuple[str, float]] = []
     for s in plan_spends:
         if s.menu and getattr(s.menu, "name", None):
@@ -240,6 +296,7 @@ def _build_recipe_matches(
         for t in tokens:
             q |= Q(title__icontains=t) | Q(description__icontains=t)
 
+        # ดึงมาก่อน แล้วไปกรอง cps <= 0 อีกชั้น (ปลอดภัยกว่า)
         qs = Recipe.objects.filter(q).order_by("-created_at")[:20]
         for r in qs:
             if r.id in seen:
@@ -256,6 +313,10 @@ def _build_recipe_matches(
     matches: List[Dict[str, Any]] = []
     for r in suggested:
         cps = _recipe_cost_per_serving(r)
+
+        # ✅ กรองสูตรต้นทุน 0 / ติดลบ ไม่ต้องเอาขึ้นโชว์
+        if cps <= 0:
+            continue
 
         best_compare = None  # (menu_name, menu_price, diff)
         for (mn, mp) in menu_spends:
@@ -702,138 +763,233 @@ def save_expense(request):
 def save_menu_expense(request, menu_id: int):
     return consume_menu(request, menu_id)
 
-
 # =========================
 # DASHBOARD
 # =========================
 @login_required
 def dashboard(request):
-    today = timezone.localdate()
+    """
+    รองรับ 2 โหมด:
+    1) มี ?plan_id=  -> Dashboard ของแผนนั้น (ตามช่วงแผน)
+    2) ไม่มี plan_id -> โหมดทั่วไป (แยกจาก plan: plan__isnull=True)
+    """
+    plan_id = request.GET.get("plan_id")
 
-    plan = _get_active_plan(request)
-    plan_mode = bool(plan)
+    # -------------------------------
+    # โหมด Dashboard ของ "แผน"
+    # -------------------------------
+    if plan_id:
+        plan = get_object_or_404(MealPlan, id=plan_id, user=request.user)
 
-    if plan_mode:
         start_date = plan.start_date
-        end_date = plan.start_date + timedelta(days=max(plan.days, 1) - 1)
-    else:
-        start_date = _monday(today)
-        end_date = start_date + timedelta(days=6)
+        end_date = _plan_end_date(plan.start_date, int(plan.days or 1))
 
-    budgets_qs = DailyBudget.objects.filter(user=request.user, date__range=[start_date, end_date])
-    spends_qs = BudgetSpend.objects.filter(user=request.user, date__range=[start_date, end_date]).select_related("menu")
+        daily_amount = float(plan.budget_per_day or 0)
+        total_budget = daily_amount * int(plan.days or 1)
 
-    if plan_mode:
-        budgets_qs = budgets_qs.filter(plan=plan)
-        spends_qs = spends_qs.filter(plan=plan)
+        plan_spends_qs = BudgetSpend.objects.filter(
+            user=request.user,
+            plan=plan,
+            date__gte=start_date,
+            date__lte=end_date,
+        ).select_related("menu").order_by("date", "id")
 
-    total_budget = budgets_qs.aggregate(total=Sum("amount"))["total"]
-    if plan_mode and total_budget is None:
-        total_budget = (plan.budget_per_day or 0) * max(plan.days, 1)
-    total_budget = float(total_budget or 0)
+        total_spent = float(plan_spends_qs.aggregate(s=Sum("amount"))["s"] or 0)
+        remaining = total_budget - total_spent
+        daily_average = daily_amount
+        over_amount = max(0.0, total_spent - total_budget)
 
-    total_spent = float(spends_qs.aggregate(total=Sum("amount"))["total"] or 0)
-    remaining = total_budget - total_spent
+        # rows รายวัน
+        rows = []
+        cur = start_date
+        while cur <= end_date:
+            db = DailyBudget.objects.filter(user=request.user, plan=plan, date=cur).first()
+            budget_amount = float(db.amount) if db else daily_amount
 
-    num_days = (end_date - start_date).days + 1
-    daily_average = round(total_budget / num_days, 2) if num_days > 0 else 0
+            spends = list(plan_spends_qs.filter(date=cur))
+            spent_amount = sum(float(s.amount or 0) for s in spends)
+            remain_amount = budget_amount - spent_amount
 
-    over_amount = max(0.0, total_spent - total_budget)
-    under_amount = max(0.0, total_budget - total_spent)
+            ms = _meal_status_from_spends(spends)
 
-    spends_map = {row["date"]: float(row["total"] or 0) for row in spends_qs.values("date").annotate(total=Sum("amount"))}
-    budgets_map = {row["date"]: float(row["total"] or 0) for row in budgets_qs.values("date").annotate(total=Sum("amount"))}
+            rows.append({
+                "date": cur,
+                "is_today": (cur == timezone.localdate()),
+                "budget_amount": round(budget_amount, 2),
+                "spent_amount": round(spent_amount, 2),
+                "remain_amount": round(remain_amount, 2),
+                "spends": spends,
+                "meal_status": ms,
+                "meal_badge_text": ms["badge_text"],
+                "meal_badge_class": ms["badge_class"],
+            })
+            cur += timedelta(days=1)
+
+        # match score
+        match_score = _calc_match_score(total_budget, total_spent)
+        if match_score >= 80:
+            match_label, match_class = "ดีมาก", "bg-green-50 text-green-700 ring-green-200"
+        elif match_score >= 50:
+            match_label, match_class = "พอใช้", "bg-orange-50 text-orange-700 ring-orange-200"
+        else:
+            match_label, match_class = "ควรปรับ", "bg-red-50 text-red-700 ring-red-200"
+
+        # สรุปมื้อ
+        meal_spends_qs = plan_spends_qs.filter(note__in=MEAL_LABELS)
+        total_meals = meal_spends_qs.count()
+        meal_counts = meal_spends_qs.values("note").annotate(total=Count("id")).order_by("-total")
+        meals_by_type = [{"label": r["note"], "total": r["total"]} for r in meal_counts]
+
+        # เมนูแพง/ถูก
+        menu_totals = (
+            plan_spends_qs.filter(menu__isnull=False)
+            .values("menu__name")
+            .annotate(total=Sum("amount"))
+        )
+        expensive_menus = [{"name": r["menu__name"], "total": float(r["total"] or 0)} for r in menu_totals.order_by("-total")[:3]]
+        cheap_menus = [{"name": r["menu__name"], "total": float(r["total"] or 0)} for r in menu_totals.order_by("total")[:3]]
+
+        # แนะนำสูตรประหยัดกว่า (อิงรายการกินจริง + งบ/วัน + คงเหลือรวม)
+        recipe_matches = _build_recipe_matches(
+            plan_spends=list(plan_spends_qs),
+            budget_amount=daily_amount,
+            remain=remaining,
+            limit=8,
+        )
+
+        return render(request, "budgets/dashboard.html", {
+            "plan_mode": True,
+            "plan": plan,
+
+            "start_date": start_date,
+            "end_date": end_date,
+
+            "total_budget": round(total_budget, 2),
+            "daily_average": round(daily_average, 2),
+            "total_spent": round(total_spent, 2),
+            "remaining": round(remaining, 2),
+            "over_amount": round(over_amount, 2),
+
+            "match_score": match_score,
+            "match_label": match_label,
+            "match_class": match_class,
+
+            "rows": rows,
+
+            "recipe_matches": recipe_matches,
+            "expensive_menus": expensive_menus,
+            "cheap_menus": cheap_menus,
+            "total_meals": total_meals,
+            "meals_by_type": meals_by_type,
+        })
+
+    # -----------------------------------------
+    # โหมดทั่วไป (ไม่มี plan_id): plan__isnull=True
+    # -----------------------------------------
+    start_date = timezone.localdate()
+    end_date = start_date + timedelta(days=6)
 
     rows = []
     cur = start_date
     while cur <= end_date:
-        b = budgets_map.get(cur, None)
-        if plan_mode and b is None:
-            b = float(plan.budget_per_day or 0)
-        b = float(b or 0)
+        db = DailyBudget.objects.filter(user=request.user, plan__isnull=True, date=cur).first()
+        budget_amount = float(db.amount) if db else 0.0
 
-        s = float(spends_map.get(cur, 0) or 0)
-        remain_amount = b - s
+        spends = list(
+            BudgetSpend.objects.filter(user=request.user, plan__isnull=True, date=cur).select_related("menu")
+        )
+        spent_amount = sum(float(s.amount or 0) for s in spends)
+        remain_amount = budget_amount - spent_amount
 
-        meal_status = _meal_status_for_date(request, cur, plan if plan_mode else None)
-        meal_badge_text, meal_badge_class = _meal_badge(meal_status)
+        ms = _meal_status_from_spends(spends)
 
         rows.append({
             "date": cur,
-            "budget_amount": round(b, 2),
-            "spent_amount": round(s, 2),
+            "is_today": (cur == timezone.localdate()),
+            "budget_amount": round(budget_amount, 2),
+            "spent_amount": round(spent_amount, 2),
             "remain_amount": round(remain_amount, 2),
-            "is_today": cur == today,
-            "meal_status": meal_status,
-            "meal_badge_text": meal_badge_text,
-            "meal_badge_class": meal_badge_class,
+            "spends": spends,
+            "meal_status": ms,
+            "meal_badge_text": ms["badge_text"],
+            "meal_badge_class": ms["badge_class"],
         })
         cur += timedelta(days=1)
 
-    meal_spends_qs = spends_qs.filter(note__in=MEAL_LABELS)
-    total_meals = meal_spends_qs.count()
-    meal_counts = meal_spends_qs.values("note").annotate(total=Count("id")).order_by("-total")
-    meals_by_type = [{"meal_type": r["note"], "label": r["note"], "total": r["total"]} for r in meal_counts]
+    total_budget = sum(r["budget_amount"] for r in rows)
+    total_spent = sum(r["spent_amount"] for r in rows)
+    remaining = total_budget - total_spent
+    daily_average = round(total_budget / 7, 2) if total_budget else 0
 
-    menu_totals = spends_qs.filter(menu__isnull=False).values("menu_id", "menu__name").annotate(total=Sum("amount"))
-    expensive_menus = [{"name": r["menu__name"], "total": float(r["total"] or 0)} for r in menu_totals.order_by("-total")[:3]]
-    cheap_menus = [{"name": r["menu__name"], "total": float(r["total"] or 0)} for r in menu_totals.order_by("total")[:3]]
-
-    match_score = _calc_match_score(total_budget, total_spent)
-
-    if match_score >= 80:
-        match_label = "แมตช์ดีมาก"
-        match_class = "bg-green-50 text-green-700 ring-green-200"
-    elif match_score >= 50:
-        match_label = "พอใช้ได้"
-        match_class = "bg-yellow-50 text-yellow-800 ring-yellow-200"
-    else:
-        match_label = "ต้องปรับแผน"
-        match_class = "bg-red-50 text-red-700 ring-red-200"
-
-    # หมายเหตุ: ชื่อ url "budgets:home" ต้องตรงกับ urls.py ของคุณ
-    budget_table_url = reverse("budgets:home")
-    summary_url = reverse("budgets:weekly_summary")
-    if plan_mode or request.GET.get("from_plan") == "1":
-        budget_table_url = f"{budget_table_url}?from_plan=1"
-        summary_url = f"{summary_url}?from_plan=1"
-
-    # ทำ recipe_matches ให้ dashboard ใช้ได้จริง (คำนวณแบบภาพรวมช่วง)
-    spend_list = list(spends_qs)
-    remain_per_day = (remaining / num_days) if num_days > 0 else remaining
-    recipe_matches = _build_recipe_matches(
-        plan_spends=spend_list,
-        budget_amount=float(daily_average or 0),
-        remain=float(remain_per_day or 0),
-        limit=8,
-    )
-
-    context = {
-        "plan_mode": plan_mode,
-        "plan": plan,
+    return render(request, "budgets/dashboard.html", {
+        "plan_mode": False,
+        "plan": None,
         "start_date": start_date,
         "end_date": end_date,
-        "rows": rows,
-
         "total_budget": round(total_budget, 2),
         "daily_average": daily_average,
         "total_spent": round(total_spent, 2),
         "remaining": round(remaining, 2),
-        "over_amount": round(over_amount, 2),
-        "under_amount": round(under_amount, 2),
+        "over_amount": round(max(0, total_spent - total_budget), 2),
 
-        "total_meals": total_meals,
-        "meals_by_type": meals_by_type,
-        "expensive_menus": expensive_menus,
-        "cheap_menus": cheap_menus,
-        "match_score": match_score,
+        "match_score": 0,
+        "match_label": "",
+        "match_class": "bg-gray-50 text-gray-700 ring-gray-200",
 
-        "match_label": match_label,
-        "match_class": match_class,
+        "rows": rows,
+        "recipe_matches": [],
+        "expensive_menus": [],
+        "cheap_menus": [],
+        "total_meals": 0,
+        "meals_by_type": [],
+    })
 
-        "budget_table_url": budget_table_url,
-        "summary_url": summary_url,
+@login_required
+@require_POST
+def add_recipe_to_day(request, recipe_id: int):
+    """
+    เพิ่ม "สูตรอาหารแนะนำ" เข้าแผนของวันนั้นทันที
+    - บันทึกเป็น BudgetSpend (menu=None) เพื่อไม่ต้องแก้ Model
+    - amount = cost/serving (จาก recipe.total_cost / recipe.servings)
+    - note = มื้อที่เลือก + ชื่อสูตร
+    - รองรับ plan_id ผ่าน query หรือ active_plan ใน session
+    """
+    recipe = get_object_or_404(Recipe, pk=recipe_id)
 
-        "recipe_matches": recipe_matches,  # สำคัญ: template ใช้ตัวนี้
-    }
-    return render(request, "budgets/dashboard.html", context)
+    # date จากฟอร์ม (ส่งมาใน hidden input)
+    use_date = _parse_date_or_today(request.POST.get("date"))
+
+    # เลือกมื้อ
+    meal_label = (request.POST.get("meal_label") or "").strip()
+    if meal_label not in MEAL_LABELS:
+        meal_label = ""  # ไม่บังคับให้เป็นมื้อ
+
+    # ใช้ plan ตามระบบคุณ (priority: plan_id ใน query > session active_plan_id)
+    active_plan = _get_active_plan(request)
+
+    # สร้างงบรายวันถ้ายังไม่มี
+    _safe_get_or_create_daily(request, use_date, plan=active_plan)
+
+    # ราคาต่อเสิร์ฟ
+    cps = _recipe_cost_per_serving(recipe)
+    if cps <= 0:
+        messages.error(request, "สูตรนี้ยังไม่มีต้นทุน/จำนวนเสิร์ฟ จึงเพิ่มเป็นรายการใช้จ่ายไม่ได้")
+        return redirect(request.META.get("HTTP_REFERER") or "/budget/?from_plan=1")
+
+    # note ให้เห็นชัดว่าเป็นสูตร
+    if meal_label:
+        note = f"{meal_label} (สูตร) {recipe.title}"
+    else:
+        note = f"(สูตร) {recipe.title}"
+
+    BudgetSpend.objects.create(
+        user=request.user,
+        date=use_date,
+        amount=cps,
+        plan=active_plan,
+        menu=None,
+        note=note,
+    )
+
+    messages.success(request, f"เพิ่มสูตร '{recipe.title}' เข้าวันที่ {use_date} แล้ว ({cps:.2f} บาท/เสิร์ฟ)")
+    return redirect(request.META.get("HTTP_REFERER") or f"/budget/budget/day/{use_date.isoformat()}/?from_plan=1")

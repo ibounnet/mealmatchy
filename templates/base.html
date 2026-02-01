@@ -94,10 +94,9 @@
       {% else %}
       <!-- Guest -->
       <div class="flex items-center gap-2">
-        <a href="{% url 'login' %}" class="px-3 py-2 rounded-lg hover:bg-gray-50">เข้าสู่ระบบ</a>
-        <a href="{% url 'register' %}" class="px-3 py-2 rounded-lg bg-primary text-white">
-          สมัครสมาชิก
-        </a>
+        <a href="{% url 'accounts:login' %}" class="px-3 py-2 rounded-lg hover:bg-gray-50">เข้าสู่ระบบ</a>
+        <a href="{% url 'accounts:register' %}" class="px-3 py-2 rounded-lg bg-primary text-white">สมัครสมาชิก</a>
+
       </div>
       {% endif %}
 
