@@ -1,0 +1,173 @@
+{# templates/admin/_sidebar.html #}
+<aside class="h-screen sticky top-0 w-72 bg-white border-r border-gray-200">
+  <!-- Header -->
+  <div class="px-5 pt-5 pb-4 border-b border-gray-100">
+    <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary-light text-primary ring-1 ring-orange-100 text-xs font-semibold">
+      Admin Mode
+    </div>
+
+    <div class="mt-3">
+      <div class="text-sm font-bold text-gray-900">แดชบอร์ด</div>
+      <div class="text-xs text-gray-500">จัดการระบบ</div>
+    </div>
+  </div>
+
+  <!-- Menu -->
+  <nav class="px-3 py-4 space-y-5 text-sm">
+
+    <!-- กลุ่ม: ภาพรวม -->
+    <div>
+      <div class="px-3 mb-2 text-[11px] font-semibold tracking-wide text-gray-500 uppercase">
+        ภาพรวมระบบ
+      </div>
+
+      <a href="{% url 'accounts:admin_dashboard' %}"
+         class="
+           group flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl
+           {% if '/accounts/admin-tools/' in request.path %} bg-primary-light text-gray-900 ring-1 ring-orange-100 {% else %} text-gray-700 hover:bg-gray-50 {% endif %}
+         ">
+        <div class="flex items-center gap-3">
+          <span class="h-8 w-8 rounded-lg bg-white ring-1 ring-gray-200 flex items-center justify-center">
+            <!-- icon: home/dashboard -->
+            <svg class="w-4 h-4 {% if '/accounts/admin-tools/' in request.path %} text-primary {% else %} text-gray-500 group-hover:text-primary {% endif %}"
+                 viewBox="0 0 24 24" fill="currentColor">
+              <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/>
+            </svg>
+          </span>
+          <div class="leading-tight">
+            <div class="font-semibold">แดชบอร์ด</div>
+            <div class="text-xs text-gray-500">ภาพรวมการจัดการ</div>
+          </div>
+        </div>
+
+        {% if total_pending %}
+          <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-primary-light text-primary ring-1 ring-orange-100">
+            {{ total_pending }}
+          </span>
+        {% endif %}
+      </a>
+    </div>
+
+    <!-- กลุ่ม: จัดการข้อมูล -->
+    <div>
+      <div class="px-3 mb-2 text-[11px] font-semibold tracking-wide text-gray-500 uppercase">
+        จัดการข้อมูล
+      </div>
+
+      <!-- คำขอเมนู -->
+      <a href="{% url 'menus:admin_menu_list' %}?status=pending"
+         class="
+           group flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl
+           {% if '/menus/admin/' in request.path %} bg-primary-light text-gray-900 ring-1 ring-orange-100 {% else %} text-gray-700 hover:bg-gray-50 {% endif %}
+         ">
+        <div class="flex items-center gap-3">
+          <span class="h-8 w-8 rounded-lg bg-white ring-1 ring-gray-200 flex items-center justify-center">
+            <!-- icon: food -->
+            <svg class="w-4 h-4 {% if '/menus/admin/' in request.path %} text-primary {% else %} text-gray-500 group-hover:text-primary {% endif %}"
+                 viewBox="0 0 24 24" fill="currentColor">
+              <path d="M4 3h16v2H4V3zm2 4h12l-1 14H7L6 7zm3 2v10h2V9H9zm4 0v10h2V9h-2z"/>
+            </svg>
+          </span>
+          <div class="leading-tight">
+            <div class="font-semibold">คำขอเมนูอาหาร</div>
+            <div class="text-xs text-gray-500">ตรวจสอบคำขอเพิ่มเมนู</div>
+          </div>
+        </div>
+        <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
+          {{ pending_menus|default:0 }}
+        </span>
+      </a>
+
+      <!-- คำขอร้าน -->
+      <a href="{% url 'restaurants:admin_restaurant_list' %}"
+         class="
+           group flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl mt-2
+           {% if '/restaurants/admin/' in request.path %} bg-primary-light text-gray-900 ring-1 ring-orange-100 {% else %} text-gray-700 hover:bg-gray-50 {% endif %}
+         ">
+        <div class="flex items-center gap-3">
+          <span class="h-8 w-8 rounded-lg bg-white ring-1 ring-gray-200 flex items-center justify-center">
+            <!-- icon: store -->
+            <svg class="w-4 h-4 {% if '/restaurants/admin/' in request.path %} text-primary {% else %} text-gray-500 group-hover:text-primary {% endif %}"
+                 viewBox="0 0 24 24" fill="currentColor">
+              <path d="M4 4h16l-1 6H5L4 4zm1 8h14v8H5v-8zm2 2v4h4v-4H7zm6 0v4h4v-4h-4z"/>
+            </svg>
+          </span>
+          <div class="leading-tight">
+            <div class="font-semibold">คำขอร้านอาหาร</div>
+            <div class="text-xs text-gray-500">ตรวจสอบคำขอเพิ่มร้าน</div>
+          </div>
+        </div>
+        <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
+          {{ pending_restaurants|default:0 }}
+        </span>
+      </a>
+
+      <!-- วัตถุดิบ -->
+      <a href="{% url 'menus:admin_ingredient_list' %}"
+         class="
+           group flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl mt-2
+           {% if '/menus/admin/ingredients' in request.path %} bg-primary-light text-gray-900 ring-1 ring-orange-100 {% else %} text-gray-700 hover:bg-gray-50 {% endif %}
+         ">
+        <div class="flex items-center gap-3">
+          <span class="h-8 w-8 rounded-lg bg-white ring-1 ring-gray-200 flex items-center justify-center">
+            <!-- icon: database -->
+            <svg class="w-4 h-4 {% if '/menus/admin/ingredients' in request.path %} text-primary {% else %} text-gray-500 group-hover:text-primary {% endif %}"
+                 viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C7 2 3 3.79 3 6v12c0 2.21 4 4 9 4s9-1.79 9-4V6c0-2.21-4-4-9-4zm0 2c4.42 0 7 .99 7 2s-2.58 2-7 2-7-.99-7-2 2.58-2 7-2zm0 16c-4.42 0-7-.99-7-2v-2c1.66 1.01 4.57 1.5 7 1.5s5.34-.49 7-1.5v2c0 1.01-2.58 2-7 2z"/>
+            </svg>
+          </span>
+          <div class="leading-tight">
+            <div class="font-semibold">วัตถุดิบ</div>
+            <div class="text-xs text-gray-500">รายการจากการ scrape</div>
+          </div>
+        </div>
+        <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
+          {{ ingredient_count|default:0 }}
+        </span>
+      </a>
+    </div>
+
+    <!-- กลุ่ม: คอมมูนิตี้ -->
+    <div>
+      <div class="px-3 mb-2 text-[11px] font-semibold tracking-wide text-gray-500 uppercase">
+        จัดการคอมมูนิตี้
+      </div>
+
+      <a href="{% url 'community:topic_list' %}"
+         class="group flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-700 hover:bg-gray-50">
+        <span class="h-8 w-8 rounded-lg bg-white ring-1 ring-gray-200 flex items-center justify-center">
+          <svg class="w-4 h-4 text-gray-500 group-hover:text-primary" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M4 4h16v12H7l-3 3V4zm3 5h10v2H7V9zm0-3h10v2H7V6zm0 6h6v2H7v-2z"/>
+          </svg>
+        </span>
+        <div class="leading-tight">
+          <div class="font-semibold">โพสต์ (Topics)</div>
+          <div class="text-xs text-gray-500">เข้าไปดู/ลบโพสต์ไม่เหมาะสม</div>
+        </div>
+      </a>
+
+      <a href="{% url 'community:topic_list' %}"
+         class="group flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-700 hover:bg-gray-50 mt-2">
+        <span class="h-8 w-8 rounded-lg bg-white ring-1 ring-gray-200 flex items-center justify-center">
+          <svg class="w-4 h-4 text-gray-500 group-hover:text-primary" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
+          </svg>
+        </span>
+        <div class="leading-tight">
+          <div class="font-semibold">รีวิว (Reviews)</div>
+          <div class="text-xs text-gray-500">เข้าไปดู/ลบรีวิวไม่เหมาะสม</div>
+        </div>
+      </a>
+
+      <div class="px-3 mt-3 text-xs text-gray-500">
+        หมายเหตุ: ระบบนี้ “ไม่ต้องอนุมัติ” — จัดการโดยการลบเมื่อไม่เหมาะสม
+      </div>
+    </div>
+
+  </nav>
+
+  <!-- Footer -->
+  <div class="absolute bottom-0 left-0 right-0 border-t border-gray-100 p-4 text-xs text-gray-500">
+    เข้าสู่ระบบในฐานะ: <span class="font-semibold text-gray-700">{{ user.username }}</span>
+  </div>
+</aside>

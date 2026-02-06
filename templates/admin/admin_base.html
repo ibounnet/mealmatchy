@@ -1,0 +1,60 @@
+{# templates/admin/admin_base.html #}
+{% load static %}
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <title>{% block title %}Admin Panel - MealMatchy{% endblock %}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: { DEFAULT:'#f97316', dark:'#ea580c', light:'#fff7ed' }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+
+<body class="bg-gray-50 text-gray-900">
+  <div class="flex min-h-screen">
+    {% include "admin/_sidebar.html" %}
+
+    <main class="flex-1">
+      <!-- Top bar -->
+      <div class="h-16 bg-white border-b border-gray-100 flex items-center justify-between px-6">
+        <div class="flex items-center gap-3">
+          <div class="h-9 w-9 rounded-xl bg-primary-light ring-1 ring-orange-100 flex items-center justify-center overflow-hidden">
+            <img src="{% static 'img/mealmatchy-logo.jpeg' %}" alt="MealMatchy" class="h-7 w-7 object-contain">
+          </div>
+          <div class="leading-tight">
+            <div class="font-bold">Admin Panel</div>
+            <div class="text-xs text-gray-500">MealMatchy • จัดการระบบ</div>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <a href="{% url 'home' %}"
+             class="px-3 py-2 rounded-lg ring-1 ring-gray-200 bg-white hover:bg-gray-50 text-sm">
+            กลับหน้าเว็บ
+          </a>
+          <a href="{% url 'accounts:logout' %}"
+             class="px-3 py-2 rounded-lg ring-1 ring-red-200 bg-white hover:bg-red-50 text-red-600 text-sm">
+            ออกจากระบบ
+          </a>
+        </div>
+      </div>
+
+      <!-- Content -->
+      <div class="p-6">
+        {% block content %}{% endblock %}
+      </div>
+    </main>
+  </div>
+</body>
+</html>

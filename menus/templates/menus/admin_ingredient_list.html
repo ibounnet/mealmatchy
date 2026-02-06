@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}จัดการวัตถุดิบ - MealMatchy{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+  <div class="flex items-center justify-between mb-5">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">จัดการวัตถุดิบ</h1>
+      <p class="text-sm text-gray-600 mt-1">ข้อมูลจากการ scrape และข้อมูลที่เพิ่มเอง</p>
+    </div>
+    <a href="{% url 'accounts:admin_dashboard' %}"
+       class="px-4 py-2 rounded-xl bg-white ring-1 ring-gray-200 hover:bg-gray-50 text-sm font-semibold">
+      กลับหน้าแอดมิน
+    </a>
+  </div>
+
+  <div class="bg-white rounded-2xl ring-1 ring-gray-100 shadow-sm overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead class="bg-gray-50 text-gray-600">
+          <tr>
+            <th class="text-left px-4 py-3 font-semibold">ชื่อวัตถุดิบ</th>
+            <th class="text-left px-4 py-3 font-semibold">แหล่งที่มา</th>
+            <th class="text-right px-4 py-3 font-semibold">ราคา</th>
+            <th class="text-right px-4 py-3 font-semibold">ขนาด (กรัม)</th>
+            <th class="text-right px-4 py-3 font-semibold">บาท/กรัม</th>
+            <th class="text-left px-4 py-3 font-semibold">อัปเดตล่าสุด</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y">
+          {% for i in ingredients %}
+            <tr class="hover:bg-gray-50">
+              <td class="px-4 py-3 font-semibold text-gray-900">{{ i.name }}</td>
+              <td class="px-4 py-3 text-gray-700">{{ i.source }}</td>
+              <td class="px-4 py-3 text-right text-gray-900">{{ i.price }}</td>
+              <td class="px-4 py-3 text-right text-gray-900">{{ i.size_grams }}</td>
+              <td class="px-4 py-3 text-right text-gray-900">{{ i.price_per_gram }}</td>
+              <td class="px-4 py-3 text-gray-700">{{ i.last_updated }}</td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td class="px-4 py-6 text-gray-500" colspan="6">ยังไม่มีข้อมูลวัตถุดิบ</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

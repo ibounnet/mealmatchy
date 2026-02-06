@@ -1,0 +1,48 @@
+{% extends "admin/admin_base.html" %}
+
+{% block title %}Admin Dashboard - MealMatchy{% endblock %}
+
+{% block content %}
+  <div class="mb-6">
+    <h1 class="text-2xl font-bold text-gray-900">แดชบอร์ดแอดมิน</h1>
+    <p class="text-sm text-gray-500 mt-1">ภาพรวมคำขอและข้อมูลสำคัญในระบบ</p>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <a href="{% url 'menus:admin_menu_list' %}"
+       class="bg-white rounded-2xl ring-1 ring-gray-100 shadow-sm p-5 hover:shadow-md transition">
+      <div class="text-sm text-gray-500">คำขอเมนูอาหาร (Pending)</div>
+      <div class="mt-2 flex items-end justify-between">
+        <div class="text-3xl font-bold text-gray-900">{{ pending_menus }}</div>
+        <span class="text-sm font-semibold text-primary">ไปจัดการ</span>
+      </div>
+    </a>
+
+    <a href="{% url 'restaurants:admin_restaurant_list' %}"
+       class="bg-white rounded-2xl ring-1 ring-gray-100 shadow-sm p-5 hover:shadow-md transition">
+      <div class="text-sm text-gray-500">คำขอร้านอาหาร (Pending)</div>
+      <div class="mt-2 flex items-end justify-between">
+        <div class="text-3xl font-bold text-gray-900">{{ pending_restaurants }}</div>
+        <span class="text-sm font-semibold text-primary">ไปจัดการ</span>
+      </div>
+    </a>
+
+    <a href="{% url 'menus:admin_ingredient_list' %}"
+       class="bg-white rounded-2xl ring-1 ring-gray-100 shadow-sm p-5 hover:shadow-md transition">
+      <div class="text-sm text-gray-500">วัตถุดิบทั้งหมด (Ingredients)</div>
+      <div class="mt-2 flex items-end justify-between">
+        <div class="text-3xl font-bold text-gray-900">{{ ingredient_count }}</div>
+        <span class="text-sm font-semibold text-primary">ดูรายการ</span>
+      </div>
+    </a>
+  </div>
+
+  <div class="mt-6 bg-white rounded-2xl ring-1 ring-gray-100 shadow-sm p-6">
+    <h2 class="text-lg font-semibold text-gray-900">แนวทางการทำงาน</h2>
+    <ul class="mt-3 text-sm text-gray-600 list-disc pl-5 space-y-1">
+      <li>คำขอเมนู/ร้านอาหาร: ตรวจสอบ → อนุมัติ/ปฏิเสธ</li>
+      <li>โพสต์/รีวิว: ไม่ต้องอนุมัติ → จัดการลบ/ซ่อนเมื่อพบเนื้อหาไม่เหมาะสม</li>
+      <li>วัตถุดิบ: ตรวจสอบราคา/หน่วย และแก้ไขข้อมูลที่ scrape มา</li>
+    </ul>
+  </div>
+{% endblock %}

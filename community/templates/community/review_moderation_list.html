@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}จัดการรีวิว (Admin){% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto">
+
+  <div class="flex items-start justify-between gap-4 mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">จัดการรีวิว</h1>
+      <p class="text-sm text-gray-500 mt-1">แอดมินสามารถลบรีวิวที่ไม่เหมาะสมได้</p>
+    </div>
+
+    <a href="{% url 'community:topic_list' %}"
+       class="px-4 py-2 rounded-xl bg-white ring-1 ring-gray-200 hover:bg-gray-50 text-sm font-semibold">
+      ไปหน้า Community
+    </a>
+  </div>
+
+  {% if messages %}
+    <div class="space-y-2 mb-5">
+      {% for m in messages %}
+        <div class="px-4 py-3 rounded-xl text-sm
+          {% if m.tags == 'success' %}bg-green-50 text-green-800 ring-1 ring-green-200
+          {% elif m.tags == 'error' %}bg-red-50 text-red-800 ring-1 ring-red-200
+          {% else %}bg-gray-50 text-gray-800 ring-1 ring-gray-200{% endif %}">
+          {{ m }}
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <div class="bg-white rounded-2xl ring-1 ring-gray-200 shadow-sm overflow-hidden">
+    <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+      <div class="text-sm font-semibold text-gray-700">รายการรีวิวทั้งหมด</div>
+      <div class="text-xs text-gray-500">ทั้งหมด {{ reviews|length }} รายการ</div>
+    </div>
+
+    {% if reviews %}
+      <div class="divide-y divide-gray-100">
+        {% for r in reviews %}
+          <div class="p-5">
+            <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+              <div class="min-w-0">
+                <div class="text-base font-bold text-gray-900 truncate">
+                  {% if r.topic %}หัวข้อ: {{ r.topic.title|default:"(ไม่มีหัวข้อ)" }}{% else %}รีวิว{% endif %}
+                </div>
+
+                <div class="text-xs text-gray-500 mt-1">
+                  ผู้รีวิว:
+                  {% if r.author %}{{ r.author.username }}{% elif r.user %}{{ r.user.username }}{% else %}-{% endif %}
+                  · วันที่:
+                  {% if r.created_at %}{{ r.created_at|date:"d/m/Y H:i" }}{% else %}-{% endif %}
+                </div>
+
+                {% if r.content %}
+                  <div class="mt-3 text-sm text-gray-700 line-clamp-3">{{ r.content }}</div>
+                {% elif r.text %}
+                  <div class="mt-3 text-sm text-gray-700 line-clamp-3">{{ r.text }}</div>
+                {% endif %}
+              </div>
+
+              <div class="flex items-center gap-2 shrink-0">
+                {% if r.topic %}
+                  <a href="{% url 'community:topic_detail' r.topic.id %}"
+                     class="px-3 py-2 rounded-xl bg-white ring-1 ring-gray-200 hover:bg-gray-50 text-sm font-semibold">
+                    ดูหัวข้อ
+                  </a>
+                {% endif %}
+
+                <form method="post" action="{% url 'community:review_moderation_delete' r.id %}"
+                      onsubmit="return confirm('ยืนยันลบรีวิวนี้?');">
+                  {% csrf_token %}
+                  <button type="submit"
+                          class="px-3 py-2 rounded-xl bg-red-600 text-white hover:bg-red-700 text-sm font-semibold">
+                    ลบ
+                  </button>
+                </form>
+              </div>
+
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="p-10 text-center">
+        <div class="text-lg font-bold text-gray-900">ยังไม่มีรีวิว</div>
+      </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

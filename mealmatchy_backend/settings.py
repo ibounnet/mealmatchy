@@ -156,6 +156,10 @@ LOGIN_REDIRECT_URL = '/menus/'
 LOGIN_REDIRECT_URL = '/accounts/home/'
 LOGOUT_REDIRECT_URL = '/accounts/login/'
 
+LOGIN_URL = "accounts:login"
+LOGIN_REDIRECT_URL = "home"     # user ปกติ
+LOGOUT_REDIRECT_URL = "home"
+
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')

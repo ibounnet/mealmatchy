@@ -1,5 +1,6 @@
 # accounts/urls.py
 from django.urls import path
+from . import views
 from .views import (
     home_view, register_view, login_view, logout_view,
     profile_view, profile_remove_image_view,
@@ -16,4 +17,6 @@ urlpatterns = [
 
     path("profile/", profile_view, name="profile"),
     path("profile/remove-image/", profile_remove_image_view, name="profile_remove_image"),
+    path("admin-tools/", views.admin_dashboard_view, name="admin_dashboard"),
+
 ]

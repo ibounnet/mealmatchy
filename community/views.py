@@ -256,46 +256,45 @@ def review_like_toggle(request, pk):
 
 
 # ================== MODERATION (เฉพาะ STAFF) ==================
-@staff_required
+# community/views.py (เพิ่มท้ายไฟล์ หรือแทนที่ส่วน moderation เดิม)
+
+from django.contrib import messages
+from django.contrib.admin.views.decorators import staff_member_required
+from django.shortcuts import get_object_or_404, redirect, render
+
+from .models import Topic, Review  # ถ้าชื่อโมเดลคุณไม่ใช่ Topic/Review บอกผม เดี๋ยวปรับ
+
+
+@staff_member_required
 def topic_moderation_list(request):
-    topics = Topic.objects.filter(status="pending").order_by("created_at")
+    # แสดงทั้งหมด หรือจะใส่ filter เพิ่มทีหลังได้
+    topics = Topic.objects.all().order_by("-id")
     return render(request, "community/topic_moderation_list.html", {"topics": topics})
 
 
-@staff_required
-def topic_approve(request, pk):
+@staff_member_required
+def topic_moderation_delete(request, pk):
+    if request.method != "POST":
+        return redirect("community:topic_moderation_list")
+
     topic = get_object_or_404(Topic, pk=pk)
-    topic.status = "approved"
-    topic.is_active = True
-    topic.save()
+    topic.delete()
+    messages.success(request, "ลบโพสต์เรียบร้อยแล้ว")
     return redirect("community:topic_moderation_list")
 
 
-@staff_required
-def topic_reject(request, pk):
-    topic = get_object_or_404(Topic, pk=pk)
-    topic.status = "rejected"
-    topic.save()
-    return redirect("community:topic_moderation_list")
-
-
-@staff_required
+@staff_member_required
 def review_moderation_list(request):
-    reviews = Review.objects.filter(status="pending").order_by("created_at")
+    reviews = Review.objects.select_related("topic").all().order_by("-id")
     return render(request, "community/review_moderation_list.html", {"reviews": reviews})
 
 
-@staff_required
-def review_approve(request, pk):
-    review = get_object_or_404(Review, pk=pk)
-    review.status = "approved"
-    review.save()
-    return redirect("community:review_moderation_list")
+@staff_member_required
+def review_moderation_delete(request, pk):
+    if request.method != "POST":
+        return redirect("community:review_moderation_list")
 
-
-@staff_required
-def review_reject(request, pk):
     review = get_object_or_404(Review, pk=pk)
-    review.status = "rejected"
-    review.save()
+    review.delete()
+    messages.success(request, "ลบรีวิวเรียบร้อยแล้ว")
     return redirect("community:review_moderation_list")

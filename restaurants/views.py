@@ -1,201 +1,173 @@
 # restaurants/views.py
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
-from django.contrib.admin.views.decorators import staff_member_required
-from django.views.decorators.http import require_POST
 from django.contrib import messages
-from django.db.models import Q, Case, When, Value, CharField
+from django.contrib.admin.views.decorators import staff_member_required
+from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_POST
 
 from .models import Restaurant
-from .forms import RestaurantForm
-from menus.models import Menu
 
 
-# ===================== ผู้ใช้ทั่วไป =====================
-
-@login_required
+# ==========================
+# USER PAGES (ของเดิมคุณมีอยู่แล้ว)
+# ==========================
 def restaurant_list(request):
-    qs = Restaurant.objects.filter(is_active=True).order_by('name')
-    q = (request.GET.get('q') or '').strip()
-    if q:
-        qs = qs.filter(Q(name__icontains=q) | Q(location__icontains=q))
-    return render(request, 'restaurants/restaurant_list.html', {
-        'restaurants': qs,
-        'q': q,
-    })
+    qs = Restaurant.objects.filter(is_active=True).order_by("-created_at")
+    return render(request, "restaurants/restaurant_list.html", {"restaurants": qs})
 
 
-@login_required
 def restaurant_detail(request, pk):
-    # ผู้ใช้ทั่วไปเห็นเฉพาะร้านที่อนุมัติแล้ว
-    restaurant = get_object_or_404(Restaurant, pk=pk, is_active=True)
+    r = get_object_or_404(Restaurant, pk=pk, is_active=True)
+    return render(request, "restaurants/restaurant_detail.html", {"restaurant": r})
 
-    # ดึงเมนูของร้านนี้ ตามสิทธิ์ผู้ใช้
-    if request.user.is_staff:
-        menus_qs = Menu.objects.filter(restaurant=restaurant).order_by('-created_at')
-    else:
-        menus_qs = (
-            Menu.objects
-            .filter(restaurant=restaurant)
-            .filter(
-                Q(status=Menu.Status.APPROVED) |
-                Q(created_by=request.user)
-            )
-            .order_by('-created_at')
-        )
 
-    # เตรียมข้อมูล badge สถานะให้ template ใช้งานง่าย
-    for m in menus_qs:
-        # default: ไม่มี badge (เมนูอนุมัติแล้ว)
-        m.status_badge = None
-        m.status_badge_class = ""
-
-        if m.status == Menu.Status.PENDING:
-            m.status_badge = "รออนุมัติ"
-            m.status_badge_class = "bg-yellow-100 text-yellow-700"
-        elif m.status == Menu.Status.REJECTED:
-            m.status_badge = "ถูกปฏิเสธ"
-            m.status_badge_class = "bg-red-100 text-red-700"
-
-    return render(request, 'restaurants/restaurant_detail.html', {
-        'restaurant': restaurant,
-        'menus': menus_qs,
-    })
-
-@login_required
 def request_new_restaurant(request):
     """
-    ผู้ใช้ส่งคำขอเพิ่มร้านอาหารใหม่
-    - is_active=False รอแอดมินอนุมัติ
+    คำขอเพิ่มร้าน: สร้าง Restaurant โดย is_active=False และ created_by=request.user (ถ้า login)
+    คุณมี template/restaurant_form.html อยู่แล้ว
     """
     if request.method == "POST":
-        form = RestaurantForm(request.POST, request.FILES)
-        if form.is_valid():
-            obj = form.save(commit=False)
-            obj.created_by = request.user
-            obj.is_active = False  # รอแอดมินอนุมัติ
-            obj.save()
-            messages.success(request, "ส่งคำขอเพิ่มร้านแล้ว รอผู้ดูแลอนุมัติ")
-            return redirect("restaurants:restaurant_list")
-        messages.error(request, "กรุณาตรวจสอบข้อมูลให้ถูกต้อง")
-    else:
-        form = RestaurantForm()
+        name = (request.POST.get("name") or "").strip()
+        description = (request.POST.get("description") or "").strip()
+        location = (request.POST.get("location") or "").strip()
+        image = request.FILES.get("image")
 
-    return render(
-        request,
-        "restaurants/restaurant_form.html",
-        {
-            "form": form,
-            "title": "ส่งคำขอเพิ่มร้าน",
-            "submit_text": "ส่งคำขอ",
-            "mode": "request",
-        },
-    )
+        if not name:
+            messages.error(request, "กรุณากรอกชื่อร้าน")
+            return render(request, "restaurants/restaurant_form.html")
+
+        if Restaurant.objects.filter(name=name).exists():
+            messages.error(request, "ชื่อร้านนี้มีอยู่แล้ว")
+            return render(request, "restaurants/restaurant_form.html")
+
+        r = Restaurant.objects.create(
+            name=name,
+            description=description,
+            location=location,
+            image=image,
+            is_active=False,
+            created_by=request.user if request.user.is_authenticated else None,
+        )
+        messages.success(request, "ส่งคำขอเพิ่มร้านอาหารแล้ว รอแอดมินตรวจสอบ")
+        return redirect("restaurants:restaurant_list")
+
+    return render(request, "restaurants/restaurant_form.html")
 
 
-# ===================== แอดมิน (หน้าเว็บปกติ ไม่ใช่ Django Admin) =====================
-
-
+# ==========================
+# ADMIN PAGES
+# ==========================
 @staff_member_required
 def admin_restaurant_list(request):
-    """
-    หน้าแอดมินสำหรับดู/จัดการรายชื่อร้าน
-    สามารถ filter ด้วย ?status=active หรือ ?status=pending ได้
-    """
+    status = (request.GET.get("status") or "all").lower()
+
     qs = Restaurant.objects.all().order_by("-created_at")
 
-    status = (request.GET.get("status") or "").lower()
-    if status == "active":
-        qs = qs.filter(is_active=True)
-    elif status == "pending":
+    if status == "pending":
         qs = qs.filter(is_active=False)
+    elif status == "approved":
+        qs = qs.filter(is_active=True)
+
+    # decorate ให้ template ใช้ง่าย
+    restaurants = []
+    for r in qs:
+        r._mm_status = "approved" if r.is_active else "pending"
+        r._mm_requester = r.created_by.username if r.created_by else "-"
+        restaurants.append(r)
 
     return render(
         request,
         "restaurants/admin_restaurant_list.html",
-        {
-            "restaurants": qs,
-            "status": status,
-        },
+        {"restaurants": restaurants, "active_tab": status},
     )
-
-
-@staff_member_required
-def admin_add_restaurant(request):
-    if request.method == "POST":
-        form = RestaurantForm(request.POST, request.FILES)
-        if form.is_valid():
-            obj = form.save(commit=False)
-            obj.is_active = True  # แอดมินเพิ่ม = เปิดใช้งานทันที
-            obj.save()
-            messages.success(request, "เพิ่มร้านอาหารเรียบร้อยแล้ว")
-            return redirect("restaurants:admin_restaurant_list")
-        messages.error(request, "กรุณาตรวจสอบข้อมูลให้ถูกต้อง")
-    else:
-        form = RestaurantForm()
-
-    return render(
-        request,
-        "restaurants/admin_add_restaurant.html",
-        {
-            "form": form,
-            "title": "เพิ่มร้านอาหาร (แอดมิน)",
-            "submit_text": "บันทึก",
-        },
-    )
-
-
-@staff_member_required
-def admin_edit_restaurant(request, pk: int):
-    r = get_object_or_404(Restaurant, pk=pk)
-
-    if request.method == "POST":
-        form = RestaurantForm(request.POST, request.FILES, instance=r)
-        if form.is_valid():
-            form.save()
-            messages.success(request, "แก้ไขร้านอาหารเรียบร้อยแล้ว")
-            return redirect("restaurants:admin_restaurant_list")
-        messages.error(request, "กรุณาตรวจสอบข้อมูลให้ถูกต้อง")
-    else:
-        form = RestaurantForm(instance=r)
-
-    return render(
-        request,
-        "restaurants/admin_edit_restaurant.html",
-        {
-            "form": form,
-            "restaurant": r,
-            "title": "แก้ไขร้านอาหาร (แอดมิน)",
-            "submit_text": "อัปเดต",
-        },
-    )
-
-
-@staff_member_required
-def admin_delete_restaurant(request, pk: int):
-    r = get_object_or_404(Restaurant, pk=pk)
-    if request.method == "POST":
-        r.delete()
-        messages.success(request, "ลบร้านอาหารเรียบร้อยแล้ว")
-        return redirect("restaurants:admin_restaurant_list")
-    return render(request, "restaurants/admin_delete_restaurant.html", {"restaurant": r})
 
 
 @staff_member_required
 @require_POST
-def admin_approve_restaurant(request, pk: int):
+def admin_approve_restaurant(request, pk):
     r = get_object_or_404(Restaurant, pk=pk)
     r.is_active = True
     r.save(update_fields=["is_active"])
-    messages.success(request, "อนุมัติร้านอาหารเรียบร้อยแล้ว")
+    messages.success(request, f"อนุมัติร้าน '{r.name}' เรียบร้อยแล้ว")
     return redirect("restaurants:admin_restaurant_list")
 
 
 @staff_member_required
 @require_POST
-def admin_reject_restaurant(request, pk: int):
+def admin_reject_restaurant(request, pk):
     r = get_object_or_404(Restaurant, pk=pk)
-    r.is_active = False
-    r.save(update_fields=["is_active"])
-    messages.success(request, "ปิดการแสดงผล/ปฏิเสธ ร้านอาหารเรียบร้อยแล้ว")
+    name = r.name
+    r.delete()
+    messages.success(request, f"ปฏิเสธและลบคำขอร้าน '{name}' เรียบร้อยแล้ว")
+    return redirect("restaurants:admin_restaurant_list")
+
+
+@staff_member_required
+def admin_add_restaurant(request):
+    """
+    เพิ่มร้านโดยแอดมิน: บันทึกเป็น is_active=True
+    ใช้ template: restaurants/admin_add_restaurant.html (มีอยู่แล้วตามภาพ)
+    """
+    if request.method == "POST":
+        name = (request.POST.get("name") or "").strip()
+        description = (request.POST.get("description") or "").strip()
+        location = (request.POST.get("location") or "").strip()
+        image = request.FILES.get("image")
+
+        if not name:
+            messages.error(request, "กรุณากรอกชื่อร้าน")
+            return render(request, "restaurants/admin_add_restaurant.html")
+
+        if Restaurant.objects.filter(name=name).exists():
+            messages.error(request, "ชื่อร้านนี้มีอยู่แล้ว")
+            return render(request, "restaurants/admin_add_restaurant.html")
+
+        Restaurant.objects.create(
+            name=name,
+            description=description,
+            location=location,
+            image=image,
+            is_active=True,
+            created_by=request.user,
+        )
+        messages.success(request, "เพิ่มร้านอาหารเรียบร้อยแล้ว")
+        return redirect("restaurants:admin_restaurant_list")
+
+    return render(request, "restaurants/admin_add_restaurant.html")
+
+
+@staff_member_required
+def admin_edit_restaurant(request, pk):
+    r = get_object_or_404(Restaurant, pk=pk)
+
+    if request.method == "POST":
+        r.name = (request.POST.get("name") or "").strip()
+        r.description = (request.POST.get("description") or "").strip()
+        r.location = (request.POST.get("location") or "").strip()
+
+        if "image" in request.FILES:
+            r.image = request.FILES["image"]
+
+        # toggle active ได้จากฟอร์มถ้ามี checkbox
+        is_active = request.POST.get("is_active")
+        if is_active is not None:
+            r.is_active = (is_active == "on")
+
+        if not r.name:
+            messages.error(request, "กรุณากรอกชื่อร้าน")
+            return render(request, "restaurants/admin_edit_restaurant.html", {"restaurant": r})
+
+        r.save()
+        messages.success(request, "แก้ไขร้านอาหารเรียบร้อยแล้ว")
+        return redirect("restaurants:admin_restaurant_list")
+
+    return render(request, "restaurants/admin_edit_restaurant.html", {"restaurant": r})
+
+
+@staff_member_required
+@require_POST
+def admin_delete_restaurant(request, pk):
+    r = get_object_or_404(Restaurant, pk=pk)
+    name = r.name
+    r.delete()
+    messages.success(request, f"ลบร้าน '{name}' เรียบร้อยแล้ว")
     return redirect("restaurants:admin_restaurant_list")

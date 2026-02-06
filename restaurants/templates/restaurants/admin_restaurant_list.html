@@ -1,65 +1,120 @@
-{% extends 'base.html' %}
-{% block title %}จัดการร้านอาหาร (แอดมิน) | MealMatchy{% endblock %}
+{% extends "base.html" %}
+{% block title %}จัดการร้านอาหาร - Admin{% endblock %}
+
 {% block content %}
-<div class="max-w-6xl mx-auto">
-  <div class="flex items-center justify-between mb-4">
-    <h1 class="text-2xl font-bold">จัดการร้านอาหาร</h1>
-    <a class="px-4 py-2 rounded-xl bg-primary text-white" href="{% url 'restaurants:admin_add_restaurant' %}">
-      + เพิ่มร้าน
+<div class="max-w-6xl mx-auto space-y-6">
+
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-xl font-bold text-gray-900">จัดการร้านอาหาร</h1>
+      <p class="text-sm text-gray-600">คำขอเพิ่มร้านอาหาร / อนุมัติ / แก้ไข / ลบ</p>
+    </div>
+    <a href="{% url 'restaurants:admin_add_restaurant' %}"
+       class="px-4 py-2 rounded-xl bg-primary text-white hover:bg-primary-dark font-semibold">
+      + เพิ่มร้าน (แอดมิน)
     </a>
   </div>
 
-  <div class="flex gap-2 mb-4">
-    <a class="px-3 py-2 rounded-xl ring-1 ring-gray-200 {% if not status %}bg-gray-100{% endif %}"
-       href="{% url 'restaurants:admin_restaurant_list' %}">ทั้งหมด</a>
-    <a class="px-3 py-2 rounded-xl ring-1 ring-gray-200 {% if status == 'active' %}bg-gray-100{% endif %}"
-       href="{% url 'restaurants:admin_restaurant_list' %}?status=active">อนุมัติแล้ว</a>
-    <a class="px-3 py-2 rounded-xl ring-1 ring-gray-200 {% if status == 'pending' %}bg-gray-100{% endif %}"
-       href="{% url 'restaurants:admin_restaurant_list' %}?status=pending">รออนุมัติ</a>
+  <div class="bg-white rounded-2xl ring-1 ring-gray-100 p-3 flex flex-wrap gap-2">
+    <a href="{% url 'restaurants:admin_restaurant_list' %}"
+       class="px-3 py-2 rounded-xl text-sm {% if active_tab == 'all' %}bg-primary text-white{% else %}hover:bg-gray-50{% endif %}">
+      ทั้งหมด
+    </a>
+    <a href="{% url 'restaurants:admin_restaurant_list' %}?status=pending"
+       class="px-3 py-2 rounded-xl text-sm {% if active_tab == 'pending' %}bg-primary text-white{% else %}hover:bg-gray-50{% endif %}">
+      Pending
+    </a>
+    <a href="{% url 'restaurants:admin_restaurant_list' %}?status=approved"
+       class="px-3 py-2 rounded-xl text-sm {% if active_tab == 'approved' %}bg-primary text-white{% else %}hover:bg-gray-50{% endif %}">
+      Approved
+    </a>
   </div>
 
-  <div class="divide-y">
-    {% for r in restaurants %}
-      <div class="py-3 flex items-center justify-between">
-        <div class="min-w-0">
-          <div class="font-semibold truncate">{{ r.name }}</div>
-          <div class="text-sm text-gray-600 truncate">{{ r.location|default:"-" }}</div>
-          <div class="text-xs {% if r.is_active %}text-green-600{% else %}text-orange-600{% endif %}">
-            {% if r.is_active %}อนุมัติแล้ว{% else %}รออนุมัติ{% endif %}
-            {% if r.created_by %} • ผู้ขอ: {{ r.created_by.username }}{% endif %}
-          </div>
-        </div>
-        <div class="flex gap-2 items-center">
-          {% if not r.is_active %}
-            <form method="post" action="{% url 'restaurants:admin_approve_restaurant' r.pk %}">
-              {% csrf_token %}
-              <button type="submit" class="px-3 py-1 rounded-xl bg-green-600 text-white">
-                อนุมัติ
-              </button>
-            </form>
-          {% else %}
-            <form method="post" action="{% url 'restaurants:admin_reject_restaurant' r.pk %}">
-              {% csrf_token %}
-              <button type="submit" class="px-3 py-1 rounded-xl bg-yellow-500 text-white">
-                ปิดการแสดงผล
-              </button>
-            </form>
-          {% endif %}
+  <div class="bg-white rounded-2xl ring-1 ring-gray-100 overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead class="bg-gray-50 text-gray-700">
+          <tr>
+            <th class="text-left px-4 py-3">ร้าน</th>
+            <th class="text-left px-4 py-3">สถานะ</th>
+            <th class="text-left px-4 py-3">ผู้ขอ</th>
+            <th class="text-left px-4 py-3">สร้างเมื่อ</th>
+            <th class="text-right px-4 py-3">จัดการ</th>
+          </tr>
+        </thead>
 
-          <a class="px-3 py-1 rounded-xl ring-1 ring-gray-200"
-             href="{% url 'restaurants:admin_edit_restaurant' r.pk %}">แก้ไข</a>
+        <tbody class="divide-y divide-gray-100">
+          {% for r in restaurants %}
+          <tr class="hover:bg-gray-50">
+            <td class="px-4 py-3">
+              <div class="font-semibold text-gray-900">{{ r.name }}</div>
+              {% if r.location %}<div class="text-xs text-gray-500">{{ r.location }}</div>{% endif %}
+            </td>
 
-          <form method="post" action="{% url 'restaurants:admin_delete_restaurant' r.pk %}">
-            {% csrf_token %}
-            <button type="submit" class="px-3 py-1 rounded-xl ring-1 ring-gray-200">
-              ลบ
-            </button>
-          </form>
-        </div>
-      </div>
-    {% empty %}
-      <div class="bg-white rounded-2xl p-6 ring-1 ring-gray-100 text-center">ไม่มีรายการ</div>
-    {% endfor %}
+            <td class="px-4 py-3">
+              {% if r.is_active %}
+                <span class="text-xs px-2 py-1 rounded-full bg-green-50 text-green-700 ring-1 ring-green-200">APPROVED</span>
+              {% else %}
+                <span class="text-xs px-2 py-1 rounded-full bg-yellow-50 text-yellow-700 ring-1 ring-yellow-200">PENDING</span>
+              {% endif %}
+            </td>
+
+            <td class="px-4 py-3 text-gray-700">
+              {{ r.created_by.username|default:"-" }}
+            </td>
+
+            <td class="px-4 py-3 text-gray-600">
+              {{ r.created_at|date:"d/m/Y H:i" }}
+            </td>
+
+            <td class="px-4 py-3">
+              <div class="flex justify-end gap-2">
+
+                <a href="{% url 'restaurants:admin_edit_restaurant' r.id %}"
+                   class="px-3 py-2 rounded-xl bg-white ring-1 ring-gray-200 hover:bg-gray-50">
+                  แก้ไข
+                </a>
+
+                {% if not r.is_active %}
+                  <form method="post" action="{% url 'restaurants:admin_approve_restaurant' r.id %}">
+                    {% csrf_token %}
+                    <button class="px-3 py-2 rounded-xl bg-green-600 text-white hover:bg-green-700">
+                      อนุมัติ
+                    </button>
+                  </form>
+
+                  <form method="post" action="{% url 'restaurants:admin_reject_restaurant' r.id %}"
+                        onsubmit="return confirm('ปฏิเสธและลบคำขอร้านนี้ใช่ไหม?');">
+                    {% csrf_token %}
+                    <button class="px-3 py-2 rounded-xl bg-red-600 text-white hover:bg-red-700">
+                      ปฏิเสธ
+                    </button>
+                  </form>
+                {% endif %}
+
+                <form method="post" action="{% url 'restaurants:admin_delete_restaurant' r.id %}"
+                      onsubmit="return confirm('ยืนยันลบร้านนี้?');">
+                  {% csrf_token %}
+                  <button class="px-3 py-2 rounded-xl bg-white ring-1 ring-red-200 text-red-700 hover:bg-red-50">
+                    ลบ
+                  </button>
+                </form>
+
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5" class="px-4 py-10 text-center text-gray-500">
+              ไม่พบข้อมูล
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+
+      </table>
+    </div>
   </div>
+
 </div>
 {% endblock %}

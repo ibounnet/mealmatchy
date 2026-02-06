@@ -22,7 +22,7 @@
 
 <body class="bg-gray-50 text-gray-900">
 
-<!-- Navbar -->
+<!-- ✅ Navbar (ไม่มีแถบดำ Admin Mode แล้ว) -->
 <nav class="sticky top-0 z-50 bg-white border-b border-gray-100">
   <div class="max-w-7xl mx-auto px-4">
     <div class="h-16 flex items-center">
@@ -42,62 +42,76 @@
         </div>
       </a>
 
-      <!-- SPACER ดันเมนูไปฝั่งขวา -->
       <div class="flex-1"></div>
 
       {% if user.is_authenticated %}
-      <!-- RIGHT: Menu -->
-      <div class="hidden md:flex items-center gap-2 text-sm mr-3">
-        <a href="{% url 'home' %}" class="px-3 py-2 rounded-lg hover:bg-gray-50 hover:text-primary">
-          หน้าแรก
-        </a>
-        <a href="{% url 'menus:menu_list' %}" class="px-3 py-2 rounded-lg hover:bg-gray-50 hover:text-primary">
-          เมนูอาหาร
-        </a>
-        <a href="{% url 'restaurants:restaurant_list' %}" class="px-3 py-2 rounded-lg hover:bg-gray-50 hover:text-primary">
-          ร้านอาหาร
-        </a>
-        <a href="{% url 'recipes:list' %}" class="px-3 py-2 rounded-lg hover:bg-gray-50 hover:text-primary">
-          สูตรอาหาร
-        </a>
-        <a href="{% url 'community:topic_list' %}" class="px-3 py-2 rounded-lg hover:bg-gray-50 hover:text-primary">
-          Community
-        </a>
-      </div>
+        <!-- Main menu -->
+        <div class="hidden md:flex items-center gap-2 text-sm mr-3">
+          <a href="{% url 'home' %}" class="px-3 py-2 rounded-lg hover:bg-gray-50 hover:text-primary">หน้าแรก</a>
+          <a href="{% url 'menus:menu_list' %}" class="px-3 py-2 rounded-lg hover:bg-gray-50 hover:text-primary">เมนูอาหาร</a>
+          <a href="{% url 'restaurants:restaurant_list' %}" class="px-3 py-2 rounded-lg hover:bg-gray-50 hover:text-primary">ร้านอาหาร</a>
+          <a href="{% url 'recipes:list' %}" class="px-3 py-2 rounded-lg hover:bg-gray-50 hover:text-primary">สูตรอาหาร</a>
+          <a href="{% url 'community:topic_list' %}" class="px-3 py-2 rounded-lg hover:bg-gray-50 hover:text-primary">Community</a>
+        </div>
 
-      <!-- Profile dropdown -->
-      <div class="relative" id="profile-dd">
-        <button id="profile-dd-btn"
-                class="flex items-center gap-2 px-3 py-2 rounded-lg ring-1 ring-gray-200 hover:bg-gray-50">
-          <span class="text-sm font-semibold">โปรไฟล์</span>
-          <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-            <path fill-rule="evenodd"
-              d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z"
-              clip-rule="evenodd"/>
-          </svg>
-        </button>
+        <!-- Profile dropdown -->
+        <div class="relative" id="profile-dd">
+          <button id="profile-dd-btn"
+                  type="button"
+                  class="flex items-center gap-2 px-3 py-2 rounded-lg ring-1 ring-gray-200 hover:bg-gray-50">
+            <span class="text-sm font-semibold">โปรไฟล์</span>
 
-        <div id="profile-dd-menu"
-             class="hidden absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg ring-1 ring-gray-200 z-50">
-          <a href="{% url 'accounts:profile' %}" class="block px-4 py-2 hover:bg-gray-50">
-            ข้อมูลโปรไฟล์
-          </a>
-          <a href="{% url 'plan:my_plans' %}" class="block px-4 py-2 hover:bg-gray-50">
-            แผนมื้ออาหารของฉัน
-          </a>
-          <div class="h-px bg-gray-100"></div>
-          <a href="{% url 'accounts:logout' %}" class="block px-4 py-2 text-red-600 hover:bg-gray-50">
-            ออกจากระบบ
+            {% if user.is_staff or user.is_superuser %}
+              <span class="text-[10px] px-2 py-0.5 rounded-full bg-primary-light text-primary ring-1 ring-orange-100">
+                ADMIN
+              </span>
+            {% endif %}
+
+            <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd"
+                d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z"
+                clip-rule="evenodd"/>
+            </svg>
+          </button>
+
+          <div id="profile-dd-menu"
+               class="hidden absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-lg ring-1 ring-gray-200 z-50 overflow-hidden">
+
+            <!-- User tools -->
+            <a href="{% url 'accounts:profile' %}" class="block px-4 py-2 hover:bg-gray-50">
+              ข้อมูลโปรไฟล์
+            </a>
+            <a href="{% url 'plan:my_plans' %}" class="block px-4 py-2 hover:bg-gray-50">
+              แผนมื้ออาหารของฉัน
+            </a>
+
+            {% if user.is_staff or user.is_superuser %}
+              <div class="h-px bg-gray-100"></div>
+              <div class="px-4 pt-3 pb-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                Admin Tools
+              </div>
+
+              <!-- ✅ เหลือแค่นี้พอ: เข้าแดชบอร์ดแอดมิน -->
+              <a href="{% url 'accounts:admin_dashboard' %}" class="block px-4 py-2 hover:bg-gray-50">
+                ศูนย์จัดการแอดมิน (Dashboard)
+              </a>
+            {% endif %}
+
+            <div class="h-px bg-gray-100"></div>
+            <a href="{% url 'accounts:logout' %}" class="block px-4 py-2 text-red-600 hover:bg-gray-50">
+              ออกจากระบบ
+            </a>
+          </div>
+        </div>
+
+      {% else %}
+        <!-- Guest -->
+        <div class="flex items-center gap-2">
+          <a href="{% url 'accounts:login' %}" class="px-3 py-2 rounded-lg hover:bg-gray-50">เข้าสู่ระบบ</a>
+          <a href="{% url 'accounts:register' %}" class="px-3 py-2 rounded-lg bg-primary text-white hover:bg-primary-dark">
+            สมัครสมาชิก
           </a>
         </div>
-      </div>
-      {% else %}
-      <!-- Guest -->
-      <div class="flex items-center gap-2">
-        <a href="{% url 'accounts:login' %}" class="px-3 py-2 rounded-lg hover:bg-gray-50">เข้าสู่ระบบ</a>
-        <a href="{% url 'accounts:register' %}" class="px-3 py-2 rounded-lg bg-primary text-white">สมัครสมาชิก</a>
-
-      </div>
       {% endif %}
 
     </div>
@@ -123,6 +137,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   document.addEventListener("click", (e) => {
     if (!wrap.contains(e.target)) menu.classList.add("hidden");
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") menu.classList.add("hidden");
   });
 });
 </script>

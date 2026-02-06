@@ -23,12 +23,10 @@ urlpatterns = [
     path("review/<int:pk>/comment/add/", views.comment_add, name="comment_add"),
     path("comment/<int:pk>/delete/", views.comment_delete, name="comment_delete"),
 
-    # moderation (staff)
+    # moderation (staff) — จัดการโดย “ลบ”
     path("moderation/topics/", views.topic_moderation_list, name="topic_moderation_list"),
-    path("moderation/topic/<int:pk>/approve/", views.topic_approve, name="topic_approve"),
-    path("moderation/topic/<int:pk>/reject/", views.topic_reject, name="topic_reject"),
+    path("moderation/topic/<int:pk>/delete/", views.topic_moderation_delete, name="topic_moderation_delete"),
 
     path("moderation/reviews/", views.review_moderation_list, name="review_moderation_list"),
-    path("moderation/review/<int:pk>/approve/", views.review_approve, name="review_approve"),
-    path("moderation/review/<int:pk>/reject/", views.review_reject, name="review_reject"),
+    path("moderation/review/<int:pk>/delete/", views.review_moderation_delete, name="review_moderation_delete"),
 ]

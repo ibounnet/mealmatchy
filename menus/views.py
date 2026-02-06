@@ -1,252 +1,310 @@
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
-from django.contrib.admin.views.decorators import staff_member_required
+# menus/views.py
 from django.contrib import messages
-from django.core.paginator import Paginator
-from django.db.models import Q
+from django.contrib.admin.views.decorators import staff_member_required
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
-from django.utils.http import url_has_allowed_host_and_scheme
 
+from .models import Menu, Ingredient
 from restaurants.models import Restaurant
-from .models import Menu
-from .forms import MenuForm
-from .utils import filter_by_plan
-from searches.services import log_search
 
-# ============================
-# เมนูฝั่งผู้ใช้ทั่วไป
-# ============================
 
-@login_required
-def menu_list(request):
-    qs = Menu.objects.all().order_by('-created_at')
-
-    # ถ้ามี plan ใน session ให้กรอง
-    plan = request.session.get('plan')
-    qs = filter_by_plan(qs, plan)
-
-    # ถ้ามี budget ใน query ให้กรองราคาไม่เกิน
-    budget = request.GET.get('budget') or (plan and plan.get('budget'))
-    if budget and str(budget).isdigit():
-        qs = qs.filter(price__lte=int(budget))
-
-    return render(request, 'menus/menu_list.html', {
-        'menus': qs,
-        'budget': budget or '',
-        'plan': plan or {},
-    })
+# =========================
+# USER PAGES
+# =========================
 
 def menu_list(request):
-    q = (request.GET.get("q") or "").strip()
-    category = request.GET.get("category") or ""
-    restaurant = request.GET.get("restaurant") or ""
-    budget = request.GET.get("budget") or ""
-
-    qs = Menu.objects.all()
-
-    if q:
-        qs = qs.filter(name__icontains=q)
-
-    if category:
-        qs = qs.filter(category__id=category)
-
-    if restaurant:
-        qs = qs.filter(restaurant__id=restaurant)
-
-    if budget:
-        try:
-            qs = qs.filter(price__lte=float(budget))
-        except Exception:
-            pass
-
-    # คำนวณจำนวนผลลัพธ์
-    result_count = qs.count()
-
-    # บันทึกประวัติ (เฉพาะตอนเป็น GET และมีการ “ค้น/กรอง” จริง)
-    has_search_intent = any([q, category, restaurant, budget])
-    if request.method == "GET" and has_search_intent and request.user.is_authenticated:
-        filters = {
-            "category": category,
-            "restaurant": restaurant,
-            "budget": budget,
-        }
-        log_search(
-            user=request.user,
-            path=request.path,
-            keyword=q,
-            filters=filters,
-            result_count=result_count,
-        )
-
+    # ผู้ใช้ทั่วไปเห็นเฉพาะเมนูที่ APPROVED
+    qs = Menu.objects.filter(status=Menu.Status.APPROVED).order_by("-created_at")
     return render(request, "menus/menu_list.html", {"menus": qs})
 
+
+def menu_detail(request, pk):
+    # ผู้ใช้ทั่วไปดูได้เฉพาะ APPROVED
+    m = get_object_or_404(Menu, pk=pk, status=Menu.Status.APPROVED)
+    return render(request, "menus/menu_detail.html", {"menu": m})
 
 
 @login_required
 def add_menu(request):
-    if request.method == 'POST':
-        form = MenuForm(request.POST, request.FILES)
-        if form.is_valid():
-            menu = form.save(commit=False)
-            menu.created_by = request.user
-            menu.status = Menu.Status.PENDING
-            menu.save()
-            messages.success(request, "เพิ่มเมนูสำเร็จ รอแอดมินอนุมัติ")
-            return redirect('menus:menu_list')
-        else:
-            messages.error(request, "ข้อมูลไม่ถูกต้อง โปรดตรวจสอบอีกครั้ง")
-    else:
-        form = MenuForm()
-    return render(request, 'menus/add_menu.html', {'form': form})
+    """
+    ผู้ใช้ส่งคำขอเพิ่มเมนู -> status=PENDING, created_by=user
+    (ฟอร์มของคุณเดิมอาจใช้ templates/menus/add_menu.html อยู่แล้ว)
+    """
+    if request.method == "POST":
+        restaurant_id = request.POST.get("restaurant")
+        restaurant_name = (request.POST.get("restaurant_name") or "").strip()
+        name = (request.POST.get("name") or "").strip()
+        description = (request.POST.get("description") or "").strip()
+        price = request.POST.get("price") or "0"
+        image = request.FILES.get("image")
+
+        if not name:
+            messages.error(request, "กรุณากรอกชื่อเมนู")
+            return render(request, "menus/add_menu.html", {"restaurants": Restaurant.objects.filter(is_active=True)})
+
+        restaurant = None
+        if restaurant_id:
+            restaurant = Restaurant.objects.filter(pk=restaurant_id, is_active=True).first()
+            if restaurant and not restaurant_name:
+                restaurant_name = restaurant.name
+
+        m = Menu.objects.create(
+            restaurant=restaurant,
+            restaurant_name=restaurant_name,
+            name=name,
+            description=description,
+            price=price,
+            image=image,
+            status=Menu.Status.PENDING,
+            created_by=request.user,
+        )
+
+        # ingredients (optional): รับเป็นชื่อๆคั่นด้วย comma ก็ได้
+        # แต่คุณทำ ManyToMany แล้ว ถ้ายังไม่มี UI ก็ข้ามได้
+        messages.success(request, "ส่งคำขอเพิ่มเมนูแล้ว รอแอดมินตรวจสอบ")
+        return redirect("menus:menu_list")
+
+    return render(request, "menus/add_menu.html", {"restaurants": Restaurant.objects.filter(is_active=True)})
 
 
 @login_required
 def edit_menu(request, pk):
-    menu = get_object_or_404(Menu, pk=pk)
-    if not request.user.is_staff and menu.created_by_id != request.user.id:
-        messages.error(request, 'คุณไม่มีสิทธิ์แก้ไขเมนูนี้')
-        return redirect('menus:menu_list')
+    """
+    ให้เจ้าของเมนูแก้ได้ (หรือ staff ก็แก้ได้)
+    """
+    m = get_object_or_404(Menu, pk=pk)
+    if not (request.user.is_staff or request.user.is_superuser or m.created_by == request.user):
+        messages.error(request, "คุณไม่มีสิทธิ์แก้ไขเมนูนี้")
+        return redirect("menus:menu_list")
 
-    if request.method == 'POST':
-        form = MenuForm(request.POST, request.FILES, instance=menu)
-        if form.is_valid():
-            obj = form.save(commit=False)
-            # ถ้า user แก้เมนูของตัวเองและเมนูยังไม่อนุมัติ → กลับไป PENDING
-            if not request.user.is_staff and menu.status != Menu.Status.APPROVED:
-                obj.status = Menu.Status.PENDING
-                obj.approved_by = None
-                obj.approved_at = None
-            obj.save()
-            messages.success(request, 'อัปเดตเมนูเรียบร้อยแล้ว')
-            return redirect('menus:menu_list')
-        messages.error(request, 'แก้ไขไม่สำเร็จ กรุณาตรวจสอบข้อมูล')
-    else:
-        form = MenuForm(instance=menu)
-    return render(request, 'menus/edit_menu.html', {'form': form, 'menu': menu})
+    if request.method == "POST":
+        m.name = (request.POST.get("name") or "").strip()
+        m.description = (request.POST.get("description") or "").strip()
+        m.price = request.POST.get("price") or "0"
 
+        restaurant_id = request.POST.get("restaurant")
+        restaurant_name = (request.POST.get("restaurant_name") or "").strip()
 
-@login_required
-def delete_menu(request, pk):
-    menu = get_object_or_404(Menu, pk=pk)
-    if not request.user.is_staff and menu.created_by_id != request.user.id:
-        messages.error(request, 'คุณไม่มีสิทธิ์ลบเมนูนี้')
-        return redirect('menus:menu_list')
+        if restaurant_id:
+            m.restaurant = Restaurant.objects.filter(pk=restaurant_id, is_active=True).first()
+            if m.restaurant and not restaurant_name:
+                restaurant_name = m.restaurant.name
+        m.restaurant_name = restaurant_name
 
-    if request.method == 'POST':
-        menu.delete()
-        messages.success(request, 'ลบเมนูเรียบร้อยแล้ว')
-        return redirect('menus:menu_list')
-    return render(request, 'menus/delete_menu.html', {'menu': menu})
+        if "image" in request.FILES:
+            m.image = request.FILES["image"]
 
+        if not m.name:
+            messages.error(request, "กรุณากรอกชื่อเมนู")
+            return render(
+                request,
+                "menus/edit_menu.html",
+                {"menu": m, "restaurants": Restaurant.objects.filter(is_active=True), "ingredients": Ingredient.objects.all()},
+            )
 
-# menus/views.py (มีแล้ว)
-@login_required
-def add_menu_to_restaurant(request, pk):
-    restaurant = get_object_or_404(Restaurant, pk=pk, is_active=True)
-    if request.method == 'POST':
-        form = MenuForm(request.POST, request.FILES)
-        if form.is_valid():
-            m = form.save(commit=False)
-            m.restaurant = restaurant
-            m.restaurant_name = restaurant.name
-            m.created_by = request.user
-            if request.user.is_staff:
-                m.status = Menu.Status.APPROVED
-                m.approved_by = request.user
-                m.approved_at = timezone.now()
-                msg = 'เพิ่มเมนูสำเร็จ (อนุมัติทันที)'
-            else:
-                m.status = Menu.Status.PENDING
-                msg = 'ส่งเมนูเรียบร้อย รอแอดมินอนุมัติ'
-            m.save()
-            messages.success(request, msg)
-            return redirect('restaurants:restaurant_detail', pk=restaurant.pk)
-    else:
-        form = MenuForm()
+        # ถ้าผู้ใช้แก้เมนูหลังจากโดน reject อาจอยากให้กลับไป pending:
+        # m.status = Menu.Status.PENDING
+
+        m.save()
+        messages.success(request, "แก้ไขเมนูเรียบร้อยแล้ว")
+        return redirect("menus:menu_list")
+
     return render(
         request,
-        'menus/add_menu_to_restaurant.html',
-        {'form': form, 'restaurant': restaurant}
+        "menus/edit_menu.html",
+        {"menu": m, "restaurants": Restaurant.objects.filter(is_active=True), "ingredients": Ingredient.objects.all()},
     )
 
 
-# ============================
-# เมนูฝั่งแอดมิน
-# ============================
+@login_required
+@require_POST
+def delete_menu(request, pk):
+    m = get_object_or_404(Menu, pk=pk)
+    if not (request.user.is_staff or request.user.is_superuser or m.created_by == request.user):
+        messages.error(request, "คุณไม่มีสิทธิ์ลบเมนูนี้")
+        return redirect("menus:menu_list")
+
+    name = m.name
+    m.delete()
+    messages.success(request, f"ลบเมนู '{name}' แล้ว")
+    return redirect("menus:menu_list")
+
+
+@login_required
+def add_menu_to_restaurant(request, pk):
+    """
+    เพิ่มเมนูให้ร้านโดยตรง (ถ้าคุณใช้งาน)
+    pk = restaurant id
+    """
+    r = get_object_or_404(Restaurant, pk=pk, is_active=True)
+
+    if request.method == "POST":
+        name = (request.POST.get("name") or "").strip()
+        description = (request.POST.get("description") or "").strip()
+        price = request.POST.get("price") or "0"
+        image = request.FILES.get("image")
+
+        if not name:
+            messages.error(request, "กรุณากรอกชื่อเมนู")
+            return render(request, "menus/add_menu_to_restaurant.html", {"restaurant": r})
+
+        Menu.objects.create(
+            restaurant=r,
+            restaurant_name=r.name,
+            name=name,
+            description=description,
+            price=price,
+            image=image,
+            status=Menu.Status.PENDING,  # ให้เป็นคำขอ
+            created_by=request.user,
+        )
+
+        messages.success(request, "ส่งคำขอเพิ่มเมนูเข้าร้านแล้ว")
+        return redirect("restaurants:restaurant_detail", pk=r.pk)
+
+    return render(request, "menus/add_menu_to_restaurant.html", {"restaurant": r})
+
+
+# =========================
+# ADMIN PAGES (MENUS)
+# =========================
+
+@staff_member_required
+def admin_menu_list(request):
+    """
+    status filter: all / pending / approved / rejected
+    """
+    status = (request.GET.get("status") or "pending").lower()
+
+    qs = Menu.objects.select_related("restaurant", "approved_by", "created_by").order_by("-created_at")
+    if status == "pending":
+        qs = qs.filter(status=Menu.Status.PENDING)
+    elif status == "approved":
+        qs = qs.filter(status=Menu.Status.APPROVED)
+    elif status == "rejected":
+        qs = qs.filter(status=Menu.Status.REJECTED)
+
+    return render(request, "menus/admin_menu_list.html", {"menus": qs, "active_tab": status})
+
+
+@staff_member_required
+def admin_edit_menu(request, pk):
+    m = get_object_or_404(Menu, pk=pk)
+
+    if request.method == "POST":
+        m.name = (request.POST.get("name") or "").strip()
+        m.description = (request.POST.get("description") or "").strip()
+        m.price = request.POST.get("price") or "0"
+
+        restaurant_id = request.POST.get("restaurant")
+        restaurant_name = (request.POST.get("restaurant_name") or "").strip()
+
+        if restaurant_id:
+            m.restaurant = Restaurant.objects.filter(pk=restaurant_id, is_active=True).first()
+            if m.restaurant and not restaurant_name:
+                restaurant_name = m.restaurant.name
+        m.restaurant_name = restaurant_name
+
+        if "image" in request.FILES:
+            m.image = request.FILES["image"]
+
+        if not m.name:
+            messages.error(request, "กรุณากรอกชื่อเมนู")
+            return render(
+                request,
+                "menus/admin_edit_menu.html",
+                {"menu": m, "restaurants": Restaurant.objects.filter(is_active=True), "ingredients": Ingredient.objects.all()},
+            )
+
+        m.save()
+        messages.success(request, "แก้ไขเมนู (Admin) เรียบร้อยแล้ว")
+        return redirect("menus:admin_menu_list")
+
+    return render(
+        request,
+        "menus/admin_edit_menu.html",
+        {"menu": m, "restaurants": Restaurant.objects.filter(is_active=True), "ingredients": Ingredient.objects.all()},
+    )
+
+
+@staff_member_required
+@require_POST
+def admin_delete_menu(request, pk):
+    m = get_object_or_404(Menu, pk=pk)
+    name = m.name
+    m.delete()
+    messages.success(request, f"ลบเมนู '{name}' เรียบร้อยแล้ว")
+    return redirect("menus:admin_menu_list")
+
 
 @staff_member_required
 @require_POST
 def approve_menu(request, pk):
-    print("METHOD = ", request.method)  # debug
-    menu = get_object_or_404(Menu, pk=pk)
-    menu.status = Menu.Status.APPROVED
-    menu.approved_by = request.user
-    menu.approved_at = timezone.now()
-    menu.save(update_fields=['status', 'approved_by', 'approved_at'])
-    messages.success(request, f"อนุมัติเมนู '{menu.name}' เรียบร้อยแล้ว")
-    return redirect('menus:admin_menu_list')
+    m = get_object_or_404(Menu, pk=pk)
+    m.status = Menu.Status.APPROVED
+    m.approved_by = request.user
+    m.approved_at = timezone.now()
+
+    # ถ้า restaurant ถูกเลือกไว้ และ restaurant_name ว่าง ให้เติมชื่อ
+    if m.restaurant and not m.restaurant_name:
+        m.restaurant_name = m.restaurant.name
+
+    m.save()
+    messages.success(request, f"อนุมัติเมนู '{m.name}' เรียบร้อยแล้ว")
+    return redirect("menus:admin_menu_list")
 
 
 @staff_member_required
 @require_POST
 def reject_menu(request, pk):
-    menu = get_object_or_404(Menu, pk=pk)
-    menu.status = Menu.Status.REJECTED
-    menu.approved_by = request.user
-    menu.approved_at = timezone.now()
-    menu.save(update_fields=['status', 'approved_by', 'approved_at'])
-    messages.warning(request, f"ปฏิเสธเมนู '{menu.name}' เรียบร้อยแล้ว")
+    m = get_object_or_404(Menu, pk=pk)
+    m.status = Menu.Status.REJECTED
+    m.approved_by = request.user
+    m.approved_at = timezone.now()
+    m.save()
+    messages.success(request, f"ปฏิเสธเมนู '{m.name}' เรียบร้อยแล้ว")
+    return redirect("menus:admin_menu_list")
 
-    next_url = request.POST.get('next')
-    if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
-        return redirect(next_url)
-    return redirect('menus:admin_menu_list')
+
+# =========================
+# ADMIN PAGES (INGREDIENTS)
+# =========================
+
+@staff_member_required
+def admin_ingredient_list(request):
+    qs = Ingredient.objects.all().order_by("name")
+    return render(request, "menus/admin_ingredient_list.html", {"ingredients": qs})
 
 
 @staff_member_required
-def admin_menu_list(request):
-    qs = Menu.objects.all().select_related('restaurant', 'created_by').order_by('-created_at')
-    status = (request.GET.get('status') or '').upper()
-    q = (request.GET.get('q') or '').strip()
+def admin_ingredient_edit(request, pk):
+    ing = get_object_or_404(Ingredient, pk=pk)
 
-    if status in dict(Menu.Status.choices):
-        qs = qs.filter(status=status)
-    if q:
-        qs = qs.filter(
-            Q(name__icontains=q) |
-            Q(description__icontains=q) |
-            Q(restaurant__name__icontains=q)
-        )
+    if request.method == "POST":
+        ing.name = (request.POST.get("name") or "").strip()
+        ing.source = (request.POST.get("source") or "lotus").strip()
+        ing.price = request.POST.get("price") or 0
+        ing.size_grams = request.POST.get("size_grams") or 0
+        ing.price_per_gram = request.POST.get("price_per_gram") or 0
 
-    menus = Paginator(qs, 20).get_page(request.GET.get('page', 1))
-    return render(request, 'menus/admin_menu_list.html', {
-    'menus': menus,
-    'q': q,
-    'status': status,
-    'Menu': Menu,  # เพิ่มบรรทัดนี้
-})
+        if not ing.name:
+            messages.error(request, "กรุณากรอกชื่อวัตถุดิบ")
+            return render(request, "menus/admin_ingredient_edit.html", {"ing": ing})
 
-@staff_member_required
-def admin_edit_menu(request, pk):
-    menu = get_object_or_404(Menu, pk=pk)
-    if request.method == 'POST':
-        form = MenuForm(request.POST, request.FILES, instance=menu)
-        if form.is_valid():
-            form.save()
-            messages.success(request, 'อัปเดตเมนู (แอดมิน) เรียบร้อยแล้ว')
-            return redirect('menus:admin_menu_list')
-        messages.error(request, 'แก้ไขไม่สำเร็จ กรุณาตรวจสอบข้อมูล')
-    else:
-        form = MenuForm(instance=menu)
-    return render(request, 'menus/admin_edit_menu.html', {'form': form, 'menu': menu})
+        ing.save()
+        messages.success(request, "แก้ไขวัตถุดิบเรียบร้อยแล้ว")
+        return redirect("menus:admin_ingredient_list")
+
+    return render(request, "menus/admin_ingredient_edit.html", {"ing": ing})
 
 
 @staff_member_required
-def admin_delete_menu(request, pk):
-    menu = get_object_or_404(Menu, pk=pk)
-    if request.method == 'POST':
-        menu.delete()
-        messages.success(request, f"ลบเมนู '{menu.name}' เรียบร้อยแล้ว")
-        return redirect('menus:admin_menu_list')
-    return render(request, 'menus/admin_delete_menu.html', {'menu': menu})
+@require_POST
+def admin_ingredient_delete(request, pk):
+    ing = get_object_or_404(Ingredient, pk=pk)
+    name = ing.name
+    ing.delete()
+    messages.success(request, f"ลบวัตถุดิบ '{name}' แล้ว")
+    return redirect("menus:admin_ingredient_list")
