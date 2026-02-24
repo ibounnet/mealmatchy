@@ -11,17 +11,11 @@
       </p>
     </div>
 
-    {% if next %}
-      <a href="{{ next }}"
-         class="px-4 py-2 rounded-xl bg-gray-100 text-gray-700 hover:bg-gray-200 text-sm font-semibold">
-        กลับ
-      </a>
-    {% else %}
-      <a href="{% url 'recipes:list' %}"
-         class="px-4 py-2 rounded-xl bg-gray-100 text-gray-700 hover:bg-gray-200 text-sm font-semibold">
-        กลับ
-      </a>
-    {% endif %}
+    <!-- ✅ FIX: กลับไปหน้าเดิม (add_recipe) ถ้ามี next -->
+    <a href="{% if next %}{{ next }}{% else %}{{ request.META.HTTP_REFERER|default:'' }}{% endif %}"
+       class="px-4 py-2 rounded-xl bg-gray-100 text-gray-700 hover:bg-gray-200 text-sm font-semibold">
+      กลับ
+    </a>
   </div>
 
   {% if messages %}
@@ -39,6 +33,8 @@
 
   <form method="post" class="space-y-6">
     {% csrf_token %}
+
+    <!-- ✅ FIX: ส่ง next กลับไปตอน POST -->
     <input type="hidden" name="next" value="{{ next|default:'' }}">
 
     <!-- โหมด + Basic -->
@@ -72,7 +68,6 @@
       </div>
 
       <div class="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <!-- LEFT: Form -->
         <div class="lg:col-span-2 space-y-4">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -87,54 +82,33 @@
             </div>
           </div>
 
-          <!-- ELECTRIC GROUP -->
           <div id="grp-electric" class="space-y-4">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">ค่าไฟ (บาท/kWh)</label>
                 {{ form.electricity_rate_per_kwh }}
-                <p class="text-xs text-gray-500 mt-1">ถ้าไม่รู้ ใส่ค่าเฉลี่ยก่อน แล้วค่อยปรับจากบิลจริง</p>
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">เตาไฟฟ้า (W)</label>
                 {{ form.electric_power_watt }}
-                <p class="text-xs text-gray-500 mt-1">นิยม ~ 1000–2000W</p>
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Induction (W)</label>
                 {{ form.induction_power_watt }}
-                <p class="text-xs text-gray-500 mt-1">นิยม ~ 1200–2200W</p>
               </div>
-            </div>
-
-            <div class="rounded-xl bg-gray-50 ring-1 ring-gray-200 p-4 text-sm text-gray-700">
-              <div class="font-semibold">คำแนะนำ (กรอกไม่เป็นก็ใช้ได้)</div>
-              <ul class="list-disc pl-5 text-xs mt-1 space-y-1">
-                <li>ไม่รู้วัตต์: ใช้ค่าที่ระบบให้ไว้ก่อน (ปรับทีหลังได้)</li>
-                <li>ไม่รู้ค่าไฟ: ใส่ค่าเฉลี่ยในพื้นที่ แล้วค่อยปรับตามบิลจริง</li>
-              </ul>
             </div>
           </div>
 
-          <!-- GAS GROUP -->
           <div id="grp-gas" class="space-y-4">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">ค่าแก๊ส (บาท/ชั่วโมง)</label>
                 {{ form.gas_cost_per_hour }}
-                <p class="text-xs text-gray-500 mt-1">ถ้าไม่รู้ ใส่ค่าประมาณก่อน แล้วค่อยปรับ</p>
-              </div>
-              <div class="rounded-xl bg-gray-50 ring-1 ring-gray-200 p-4 text-sm text-gray-700">
-                <div class="font-semibold">หมายเหตุ</div>
-                <div class="text-xs mt-1">
-                  เตาแก๊สไม่ใช้วัตต์/ค่าไฟ ระบบจะซ่อนช่องไฟฟ้าให้อัตโนมัติ
-                </div>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- RIGHT: Preview -->
         <div class="lg:col-span-1">
           <div class="sticky top-6">
             <div class="rounded-2xl bg-orange-50 ring-1 ring-orange-200 p-5">
@@ -166,7 +140,6 @@
 
               <div class="mt-4 text-[11px] text-orange-800 leading-relaxed">
                 หมายเหตุ: ตัวเลขนี้เป็น “ต้นทุนแฝงแบบประมาณการ” เพื่อช่วยเทียบ/วิเคราะห์ต้นทุนในระบบ
-                และสามารถปรับค่าตามอุปกรณ์และต้นทุนจริงได้ในหน้านี้
               </div>
             </div>
           </div>
@@ -254,13 +227,11 @@ document.addEventListener("DOMContentLoaded", () => {
       pvNote.innerHTML =
         `โหมด <b>Advanced</b><br>` +
         `- Basic ต่อเสิร์ฟ: <b>${toMoney(basic)}</b> บาท<br>` +
-        `- Energy ต่อครั้งปรุง: <b>${toMoney(energy.cost)}</b> บาท<br>` +
-        `<span class="text-orange-800">ตอนดูรายละเอียดสูตร ระบบจะรวม: (Basic×เสิร์ฟ) + Energy</span>`;
+        `- Energy ต่อครั้งปรุง: <b>${toMoney(energy.cost)}</b> บาท<br>`;
     } else {
       pvNote.innerHTML =
         `โหมด <b>Basic</b><br>` +
-        `- ใช้ค่าเฉลี่ยต่อเสิร์ฟ: <b>${toMoney(basic)}</b> บาท<br>` +
-        `<span class="text-orange-800">Energy จะมีผลเมื่อเปลี่ยนเป็น Advanced</span>`;
+        `- ใช้ค่าเฉลี่ยต่อเสิร์ฟ: <b>${toMoney(basic)}</b> บาท<br>`;
     }
   }
 

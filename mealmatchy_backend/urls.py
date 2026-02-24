@@ -25,9 +25,10 @@ urlpatterns = [
     path('community/', include(('community.urls', 'community'), namespace='community')),
     
 
-    path('register/', RedirectView.as_view(pattern_name='register', permanent=False)),
-    path('login/',    RedirectView.as_view(pattern_name='login', permanent=False)),
-    path('logout/', RedirectView.as_view(pattern_name='logout', permanent=False)),
+    # ✅ ให้ reverse ได้จริง (accounts มี namespace)
+    path('register/', RedirectView.as_view(pattern_name='accounts:register', permanent=False)),
+    path('login/',    RedirectView.as_view(pattern_name='accounts:login', permanent=False)),
+    path('logout/',   RedirectView.as_view(pattern_name='accounts:logout', permanent=False)),
 
     path("", include("searches.urls")),
     

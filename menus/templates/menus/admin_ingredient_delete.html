@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}ลบวัตถุดิบ - MealMatchy{% endblock %}
+
+{% block content %}
+<div class="max-w-xl mx-auto bg-white rounded-2xl ring-1 ring-gray-100 shadow-sm p-6">
+  <h1 class="text-xl font-bold text-gray-900">ยืนยันการลบวัตถุดิบ</h1>
+  <p class="text-gray-700 mt-2">ต้องการลบ <span class="font-semibold">{{ ing.name }}</span> ใช่หรือไม่?</p>
+
+  <form method="post" class="mt-5 flex gap-2">
+    {% csrf_token %}
+    <button type="submit"
+            class="px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-700">
+      ลบ
+    </button>
+    <a href="{% url 'menus:admin_ingredient_list' %}"
+       class="px-4 py-2 rounded-xl bg-white ring-1 ring-gray-200 text-sm font-semibold hover:bg-gray-50">
+      ยกเลิก
+    </a>
+  </form>
+</div>
+{% endblock %}

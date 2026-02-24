@@ -25,8 +25,10 @@
             <th class="text-right px-4 py-3 font-semibold">ขนาด (กรัม)</th>
             <th class="text-right px-4 py-3 font-semibold">บาท/กรัม</th>
             <th class="text-left px-4 py-3 font-semibold">อัปเดตล่าสุด</th>
+            <th class="text-right px-4 py-3 font-semibold">จัดการ</th>
           </tr>
         </thead>
+
         <tbody class="divide-y">
           {% for i in ingredients %}
             <tr class="hover:bg-gray-50">
@@ -36,10 +38,21 @@
               <td class="px-4 py-3 text-right text-gray-900">{{ i.size_grams }}</td>
               <td class="px-4 py-3 text-right text-gray-900">{{ i.price_per_gram }}</td>
               <td class="px-4 py-3 text-gray-700">{{ i.last_updated }}</td>
+
+              <td class="px-4 py-3 text-right whitespace-nowrap">
+                <a href="{% url 'menus:admin_ingredient_edit' i.pk %}"
+                   class="inline-flex items-center px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700">
+                  แก้ไข
+                </a>
+                <a href="{% url 'menus:admin_ingredient_delete' i.pk %}"
+                   class="inline-flex items-center px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700 ml-2">
+                  ลบ
+                </a>
+              </td>
             </tr>
           {% empty %}
             <tr>
-              <td class="px-4 py-6 text-gray-500" colspan="6">ยังไม่มีข้อมูลวัตถุดิบ</td>
+              <td class="px-4 py-6 text-gray-500" colspan="7">ยังไม่มีข้อมูลวัตถุดิบ</td>
             </tr>
           {% endfor %}
         </tbody>

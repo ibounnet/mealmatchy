@@ -65,6 +65,7 @@
           <label class="block text-sm font-medium text-gray-700 mb-1">รูปภาพ</label>
           {{ form.image }}
           {% if form.image.errors %}<p class="text-sm text-red-600 mt-1">{{ form.image.errors|striptags }}</p>{% endif %}
+          <p class="text-xs text-gray-500 mt-1">หมายเหตุ: ระบบจำค่าได้ทุกช่อง ยกเว้นไฟล์รูปภาพ</p>
         </div>
       </div>
     </div>
@@ -79,7 +80,8 @@
           </p>
         </div>
 
-        <a href="{% url 'recipes:cost_settings' %}?next={{ next|default:''|urlencode }}"
+        <a id="open-cost-settings"
+           href="{% url 'recipes:cost_settings' %}?next={{ request.get_full_path|urlencode }}"
            class="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200 text-sm">
           ตั้งค่าต้นทุนแฝง
         </a>
@@ -115,16 +117,13 @@
             <label class="block text-sm font-medium text-gray-700 mb-1">
               เตาที่ใช้กับสูตรนี้ (ไม่เลือก = ใช้ค่าเริ่มต้นจากบัญชี)
             </label>
-
             {{ form.stove_type }}
             {% if form.stove_type.errors %}<p class="text-sm text-red-600 mt-1">{{ form.stove_type.errors|striptags }}</p>{% endif %}
-
             <p class="text-xs text-gray-500 mt-1">
               ถ้าโหมดบัญชีเป็น Advanced ระบบจะคิดค่าไฟ/แก๊สตามเวลาและชนิดเตาอัตโนมัติ
             </p>
           </div>
 
-          <!-- Preview จาก backend + realtime ด้วย JS -->
           <div class="rounded-xl bg-orange-50 ring-1 ring-orange-200 p-4">
             <div class="flex items-start justify-between gap-3">
               <div>
@@ -147,14 +146,13 @@
 
             <div class="mt-2 text-xs text-orange-800">
               ถ้าวัตต์/ค่าไฟไม่ตรงของคุณ ไปปรับที่
-              <a class="underline" href="{% url 'recipes:cost_settings' %}?next={{ next|default:''|urlencode }}">
+              <a class="underline" href="{% url 'recipes:cost_settings' %}?next={{ request.get_full_path|urlencode }}">
                 ตั้งค่าต้นทุนแฝง
               </a>
             </div>
           </div>
         </div>
 
-        <!-- ส่ง setting เข้า JS -->
         <script id="hybrid-setting-json" type="application/json">
         {
           "mode": "{{ setting.mode }}",
@@ -176,7 +174,7 @@
       {% endif %}
     </div>
 
-    <!-- ส่วนผสม -->
+    <!-- ส่วนผสม (ตาราง) -->
     <div class="bg-white rounded-2xl shadow-sm ring-1 ring-gray-200 p-6">
       <div class="flex items-start justify-between gap-4 mb-4">
         <div>
@@ -249,16 +247,17 @@
       <input type="hidden" name="rows_json" id="rows-input" value='{{ existing_rows_json|default:"[]"|escapejs }}'>
     </div>
 
-    <!-- ช่องข้อความเดิม -->
+    <!-- ✅ ช่องข้อความเดิม -->
     <div class="bg-white rounded-2xl shadow-sm ring-1 ring-gray-200 p-6 space-y-4">
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">ส่วนผสม (ข้อความเดิม)</label>
         {{ form.ingredients }}
+        {% if form.ingredients.errors %}<p class="text-sm text-red-600 mt-1">{{ form.ingredients.errors|striptags }}</p>{% endif %}
       </div>
-
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">ขั้นตอนทำอาหาร</label>
         {{ form.steps }}
+        {% if form.steps.errors %}<p class="text-sm text-red-600 mt-1">{{ form.steps.errors|striptags }}</p>{% endif %}
       </div>
     </div>
 
@@ -267,7 +266,7 @@
               class="flex-1 px-4 py-3 rounded-lg bg-green-600 text-white font-semibold hover:bg-green-700">
         {{ submit_text|default:"บันทึกสูตรอาหาร" }}
       </button>
-      <a href="{% url 'recipes:list' %}"
+      <a id="cancel-btn" href="{% url 'recipes:list' %}"
          class="px-4 py-3 rounded-lg bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200">
         ยกเลิก
       </a>
@@ -279,7 +278,83 @@
 <script>
 document.addEventListener("DOMContentLoaded", () => {
   // ===============================
-  // Ingredients table logic (ยึดของคุณ)
+  // ✅ Draft autosave (กันกรอกหายตอนไป cost-settings แล้วกลับมา)
+  // ===============================
+  const STORAGE_KEY = "mealmatchy_recipe_draft_v1";
+  const form = document.querySelector("form");
+  if (!form) return;
+
+  const saveDraft = () => {
+    const data = {};
+    const els = form.querySelectorAll("input[name], textarea[name], select[name]");
+    els.forEach(el => {
+      const name = el.name;
+      if (!name) return;
+
+      // browser ไม่อนุญาตให้จำไฟล์รูป
+      if (el.type === "file") return;
+
+      if (el.type === "checkbox") data[name] = !!el.checked;
+      else if (el.type === "radio") { if (el.checked) data[name] = el.value; }
+      else data[name] = el.value;
+    });
+
+    const rowsInput = document.getElementById("rows-input");
+    if (rowsInput) data["__rows_json__"] = rowsInput.value || "[]";
+
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch (e) {}
+  };
+
+  const loadDraft = () => {
+    let raw = null;
+    try { raw = localStorage.getItem(STORAGE_KEY); } catch (e) {}
+    if (!raw) return;
+
+    let data = null;
+    try { data = JSON.parse(raw); } catch (e) { return; }
+    if (!data) return;
+
+    const els = form.querySelectorAll("input[name], textarea[name], select[name]");
+    els.forEach(el => {
+      const name = el.name;
+      if (!name) return;
+      if (!(name in data)) return;
+      if (el.type === "file") return;
+
+      if (el.type === "checkbox") el.checked = !!data[name];
+      else if (el.type === "radio") el.checked = (el.value === data[name]);
+      else el.value = data[name];
+    });
+
+    const rowsInput = document.getElementById("rows-input");
+    if (rowsInput && data["__rows_json__"] != null) {
+      rowsInput.value = data["__rows_json__"];
+      rowsInput.dispatchEvent(new Event("input"));
+    }
+
+    const servingsInput = document.getElementById("id_servings");
+    const cookMinInput = document.getElementById("id_cook_minutes");
+    if (servingsInput) servingsInput.dispatchEvent(new Event("input"));
+    if (cookMinInput) cookMinInput.dispatchEvent(new Event("input"));
+  };
+
+  loadDraft();
+  form.addEventListener("input", saveDraft);
+
+  const btnCost = document.getElementById("open-cost-settings");
+  if (btnCost) btnCost.addEventListener("click", saveDraft);
+
+  const cancelBtn = document.getElementById("cancel-btn");
+  if (cancelBtn) cancelBtn.addEventListener("click", () => {
+    try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+  });
+
+  form.addEventListener("submit", () => {
+    try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+  });
+
+  // ===============================
+  // Ingredients table logic (ของเดิมหนู)
   // ===============================
   const selectEl = document.getElementById("ingredient-select");
   const searchInput = document.getElementById("ingredient-search");
@@ -315,10 +390,7 @@ document.addEventListener("DOMContentLoaded", () => {
   async function createIngredient(name, pricePerGram) {
     const res = await fetch("/recipes/api/ingredient/create/", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-CSRFToken": csrftoken
-      },
+      headers: { "Content-Type": "application/json", "X-CSRFToken": csrftoken },
       body: JSON.stringify({ name, price_per_gram: pricePerGram })
     });
     if (!res.ok) return null;
@@ -361,6 +433,7 @@ document.addEventListener("DOMContentLoaded", () => {
       price_per_gram_snapshot: r.price_per_gram_snapshot ?? r.price_per_gram,
       cost_snapshot: r.cost_snapshot ?? r.cost
     })));
+    saveDraft(); // ✅ sync แล้วเซฟ draft ด้วย
   }
 
   function renderRows() {
@@ -443,7 +516,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const name = (nameEl.value || "").trim();
         const ppg = parseFloat(ppgEl2.value || "0") || 0;
-
         if (!name) { alert("กรุณากรอกชื่อวัตถุดิบ"); return; }
 
         createBtn.disabled = true;
@@ -471,6 +543,7 @@ document.addEventListener("DOMContentLoaded", () => {
         currentPPG = parseFloat(created.price_per_gram) || 0;
         ppgEl.value = currentPPG.toFixed(4);
         updatePreviewCost();
+        saveDraft();
       });
 
       return;
@@ -489,6 +562,7 @@ document.addEventListener("DOMContentLoaded", () => {
         currentPPG = await fetchPPG(item.id);
         ppgEl.value = currentPPG.toFixed(4);
         updatePreviewCost();
+        saveDraft();
       });
       dropdownEl.appendChild(row);
     });
@@ -512,6 +586,7 @@ document.addEventListener("DOMContentLoaded", () => {
       ppgEl.value = "0.0000";
       updatePreviewCost();
     }
+    saveDraft();
   });
 
   document.addEventListener("click", (e) => {
@@ -520,7 +595,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  qtyEl.addEventListener("input", updatePreviewCost);
+  qtyEl.addEventListener("input", () => { updatePreviewCost(); saveDraft(); });
 
   addBtn.addEventListener("click", async () => {
     const id = selectEl.value;
@@ -557,90 +632,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   updatePreviewCost();
   renderRows();
-
-  // ===============================
-  // Hybrid hidden cost preview (Realtime) - ตรงกับ setting
-  // ===============================
-  const hiddenEl = document.getElementById("hidden-cost-preview");
-  const hiddenNoteEl = document.getElementById("hidden-cost-note");
-
-  const stoveSelect = document.getElementById("id_stove_type");
-  const servingsInput = document.getElementById("id_servings");
-  const cookMinInput = document.getElementById("id_cook_minutes");
-
-  function toNum(x) {
-    const n = parseFloat(String(x ?? "0").replaceAll(",", ""));
-    return Number.isFinite(n) ? n : 0;
-  }
-  function money(x) {
-    return (Math.round((toNum(x) + Number.EPSILON) * 100) / 100).toFixed(2);
-  }
-  function getSetting() {
-    const el = document.getElementById("hybrid-setting-json");
-    if (!el) return null;
-    try { return JSON.parse(el.textContent || "{}"); } catch { return null; }
-  }
-
-  function computeHiddenPreview() {
-    if (!hiddenEl || !hiddenNoteEl) return;
-
-    const s = getSetting();
-    if (!s) return;
-
-    const servings = Math.max(parseInt(servingsInput?.value || "1", 10) || 1, 1);
-    const seasoning = toNum(s.seasoning);
-    const overhead = toNum(s.overhead);
-    const basicPerServing = seasoning + overhead;
-    const basicTotal = basicPerServing * servings;
-
-    const mode = (s.mode || "basic").trim();
-
-    if (mode === "basic") {
-      hiddenEl.textContent = money(basicTotal);
-      hiddenNoteEl.innerHTML =
-        `Basic = (เครื่องปรุง ${money(seasoning)} + แฝง ${money(overhead)}) × ${servings} เสิร์ฟ<br>` +
-        `Basic รวม: <b>${money(basicTotal)}</b> บาท<br>` +
-        `Energy: <b>0.00</b> บาท (โหมด Basic ไม่คิดค่าไฟ/แก๊ส)`;
-      return;
-    }
-
-    const stovePicked = (stoveSelect?.value || "").trim();
-    const stove = stovePicked || (s.default_stove || "electric");
-
-    let cookMin = parseInt(cookMinInput?.value || "0", 10) || 0;
-    if (cookMin <= 0) cookMin = parseInt(s.default_cook_minutes || "0", 10) || 0;
-
-    const hours = cookMin / 60.0;
-
-    let energyCost = 0;
-    let energyNote = "-";
-
-    if (stove === "gas") {
-      const gasPerHour = toNum(s.gas_per_hour);
-      energyCost = gasPerHour * hours;
-      energyNote = `แก๊ส ${money(gasPerHour)} บาท/ชม × ${cookMin} นาที`;
-    } else {
-      const rate = toNum(s.electricity_rate);
-      const watt = (stove === "induction") ? toNum(s.induction_watt) : toNum(s.electric_watt);
-      const kwh = (watt / 1000.0) * hours;
-      energyCost = rate * kwh;
-      energyNote = `ไฟ ${Math.round(watt)}W → ${kwh.toFixed(3)} kWh × ${money(rate)} บาท/kWh`;
-    }
-
-    const totalHidden = basicTotal + energyCost;
-
-    hiddenEl.textContent = money(totalHidden);
-    hiddenNoteEl.innerHTML =
-      `Advanced = (Basic × ${servings} เสิร์ฟ) + Energy<br>` +
-      `Basic รวม: <b>${money(basicTotal)}</b> บาท<br>` +
-      `Energy: <b>${money(energyCost)}</b> บาท (${energyNote})`;
-  }
-
-  if (stoveSelect) stoveSelect.addEventListener("change", computeHiddenPreview);
-  if (servingsInput) servingsInput.addEventListener("input", computeHiddenPreview);
-  if (cookMinInput) cookMinInput.addEventListener("input", computeHiddenPreview);
-
-  computeHiddenPreview();
 });
 </script>
 {% endblock %}

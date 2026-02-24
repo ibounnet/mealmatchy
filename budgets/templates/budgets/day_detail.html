@@ -171,6 +171,7 @@
       </div>
     </div>
 
+    <!-- ✅ กล่องขวา: การ์ดแนะนำสูตรแบบรูป -->
     <div>
       <div class="bg-white rounded-2xl shadow-card ring-1 ring-gray-200 p-5">
         <h3 class="text-lg font-bold mb-1">เมนู/สูตรอาหารแนะนำ</h3>
@@ -178,87 +179,94 @@
           กด “ดูสูตร” เพื่ออ่านรายละเอียด และกด “เพิ่มเข้ามื้อ” เพื่อบันทึกเข้าแผนของวันนี้ทันที
         </p>
 
-        {% if recipe_matches %}
-          <div class="space-y-3">
-            {% for item in recipe_matches %}
-              <div class="bg-gray-50 rounded-xl px-3 py-3 transition ring-1 ring-gray-200">
-                <div class="flex gap-3">
-                  {% if item.recipe.image %}
-                    <img src="{{ item.recipe.image.url }}" alt="{{ item.recipe.title }}"
-                         class="w-12 h-12 rounded-lg object-cover flex-shrink-0">
-                  {% else %}
-                    <div class="w-12 h-12 rounded-lg bg-orange-50 text-xs flex items-center justify-center text-orange-700 flex-shrink-0">
-                      สูตรอาหาร
-                    </div>
-                  {% endif %}
-
-                  <div class="min-w-0 flex-1">
-                    <div class="flex items-start justify-between gap-2">
-                      <div class="text-sm font-semibold text-gray-900 truncate">
-                        {{ item.recipe.title }}
+        {% if recipe_cards %}
+          <div class="space-y-4">
+            {% for item in recipe_cards %}
+              <div class="rounded-2xl ring-1 ring-gray-200 bg-white overflow-hidden">
+                <div class="p-4">
+                  <div class="flex items-start gap-3">
+                    {% if item.recipe.image %}
+                      <img src="{{ item.recipe.image.url }}" alt="{{ item.recipe.title }}"
+                           class="w-12 h-12 rounded-xl object-cover flex-shrink-0">
+                    {% else %}
+                      <div class="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center text-xs text-gray-500 flex-shrink-0">
+                        ไม่มีรูป
                       </div>
-                      <span class="text-[11px] px-2 py-1 rounded-full ring-1 {{ item.badge_class }}">
-                        {{ item.badge }}
-                      </span>
-                    </div>
+                    {% endif %}
 
-                    <div class="mt-1 text-[12px] text-gray-600">
-                      เทียบกับเมนู: <span class="font-semibold text-gray-800">{{ item.compare_menu_name }}</span>
-                      ({{ item.compare_menu_price }} ฿/จาน)
-                    </div>
+                    <div class="min-w-0 flex-1">
+                      <div class="flex items-start justify-between gap-2">
+                        <div class="font-semibold text-gray-900 truncate">
+                          {{ item.recipe.title }}
+                        </div>
 
-                    <div class="mt-1 text-[12px] text-gray-700">
-                      ต้นทุนสูตรนี้: <span class="font-semibold text-gray-900">{{ item.cost_per_serving }} ฿</span> / เสิร์ฟ
-                      · <span class="font-semibold {% if item.diff > 0 %}text-green-700{% elif item.diff < 0 %}text-red-700{% else %}text-gray-700{% endif %}">
-                        {{ item.diff_text }}
-                      </span>
-                    </div>
-
-                    <div class="mt-2 flex flex-wrap gap-2">
-                      {% if item.fit_remaining %}
-                        <span class="text-[11px] px-2 py-1 rounded-full bg-green-50 text-green-700 ring-1 ring-green-200">
-                          เข้าในงบคงเหลือของวันนี้
+                        <span class="text-[11px] px-2 py-1 rounded-full ring-1 {{ item.badge_class }} whitespace-nowrap">
+                          {{ item.badge }}
                         </span>
-                      {% else %}
-                        <span class="text-[11px] px-2 py-1 rounded-full bg-red-50 text-red-700 ring-1 ring-red-200">
-                          เกินงบคงเหลือของวันนี้
+                      </div>
+
+                      <div class="text-xs text-gray-500 mt-1">
+                        เทียบกับเมนู:
+                        <span class="font-semibold text-gray-700">
+                          {{ item.compare_menu_name }} ({{ item.compare_menu_price }} ฿/จาน)
                         </span>
-                      {% endif %}
+                      </div>
 
-                      {% if item.fit_today_budget %}
-                        <span class="text-[11px] px-2 py-1 rounded-full bg-gray-50 text-gray-700 ring-1 ring-gray-200">
-                          ไม่เกินงบต่อวัน
+                      <div class="text-xs text-gray-700 mt-2">
+                        ต้นทุนสูตรนี้:
+                        <span class="font-semibold text-gray-900">{{ item.cost_per_serving }} ฿</span> / เสิร์ฟ
+                        ·
+                        <span class="font-semibold {% if item.diff > 0 %}text-green-700{% elif item.diff < 0 %}text-red-700{% else %}text-gray-700{% endif %}">
+                          {{ item.diff_text }}
                         </span>
-                      {% endif %}
+                      </div>
+
+                      <div class="mt-3 flex flex-wrap gap-2">
+                        {% if item.fit_remaining %}
+                          <span class="text-[11px] px-2 py-1 rounded-full bg-green-50 text-green-700 ring-1 ring-green-200">
+                            เข้าในงบคงเหลือของวันนี้
+                          </span>
+                        {% else %}
+                          <span class="text-[11px] px-2 py-1 rounded-full bg-red-50 text-red-700 ring-1 ring-red-200">
+                            เกินงบคงเหลือของวันนี้
+                          </span>
+                        {% endif %}
+
+                        {% if item.fit_today_budget %}
+                          <span class="text-[11px] px-2 py-1 rounded-full bg-gray-50 text-gray-700 ring-1 ring-gray-200">
+                            ไม่เกินงบต่อวัน
+                          </span>
+                        {% endif %}
+                      </div>
+
+                      <div class="mt-4 space-y-2">
+                        <a href="{% url 'recipes:detail' item.recipe.id %}"
+                           class="w-full inline-flex items-center justify-center px-3 py-2 rounded-xl border border-orange-200 text-orange-700 hover:bg-orange-50 text-sm font-semibold">
+                          ดูสูตร
+                        </a>
+
+                        <form method="post"
+                              action="{% url 'budgets:add_recipe_to_day' item.recipe.id %}{% if plan_mode and plan %}?from_plan=1&plan_id={{ plan.id }}{% endif %}">
+                          {% csrf_token %}
+                          <input type="hidden" name="date" value="{{ date|date:'Y-m-d' }}">
+                          <input type="hidden" name="next" value="{{ request.get_full_path }}">
+
+                          <select name="meal_label"
+                                  class="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm bg-white">
+                            <option value="">เพิ่มเป็นรายการในวัน (ไม่ระบุมื้อ)</option>
+                            <option value="มื้อเช้า">มื้อเช้า</option>
+                            <option value="มื้อเที่ยง">มื้อเที่ยง</option>
+                            <option value="มื้อเย็น">มื้อเย็น</option>
+                          </select>
+
+                          <button type="submit"
+                                  class="w-full mt-2 inline-flex items-center justify-center px-4 py-2 rounded-xl bg-orange-500 text-white hover:bg-orange-600 text-sm font-semibold">
+                            เพิ่มเข้ามื้อ
+                          </button>
+                        </form>
+                      </div>
+
                     </div>
-
-                    <div class="mt-3 flex flex-col gap-2">
-                      <a href="{% url 'recipes:detail' item.recipe.id %}"
-                         class="inline-flex items-center justify-center px-3 py-2 rounded-xl border border-orange-200 text-orange-700 hover:bg-orange-50 text-sm font-semibold">
-                        ดูสูตร
-                      </a>
-
-                      <form method="post"
-                            action="{% url 'budgets:add_recipe_to_day' item.recipe.id %}{% if plan_mode and plan %}?from_plan=1&plan_id={{ plan.id }}{% endif %}"
-                            class="space-y-2">
-                        {% csrf_token %}
-                        <input type="hidden" name="date" value="{{ date|date:'Y-m-d' }}">
-
-                        <select name="meal_label"
-                                class="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm">
-                          <option value="">เพิ่มเป็นรายการในวัน (ไม่ระบุมื้อ)</option>
-                          <option value="มื้อเช้า">มื้อเช้า</option>
-                          <option value="มื้อเที่ยง">มื้อเที่ยง</option>
-                          <option value="มื้อเย็น">มื้อเย็น</option>
-                        </select>
-
-                        <button type="submit"
-                                class="w-full inline-flex items-center justify-center px-4 py-2 rounded-xl bg-orange-500 text-white hover:bg-orange-600 text-sm font-semibold">
-                          เพิ่มเข้ามื้อ
-                        </button>
-                      </form>
-                    </div>
-
                   </div>
                 </div>
               </div>
@@ -266,7 +274,7 @@
           </div>
         {% else %}
           <p class="text-sm text-gray-400">
-            วันนี้ยังไม่มีข้อมูลเมนูในแผนให้ระบบ “เทียบต้นทุน” เพื่อแนะนำสูตรอาหาร
+            วันนี้ยังไม่มีข้อมูลเมนูในแผนให้ระบบแนะนำสูตรอาหาร
           </p>
         {% endif %}
       </div>

@@ -17,7 +17,7 @@
       {% elif not request.user.is_authenticated %}
         {# ถ้ายังไม่ล็อกอิน แสดงลิงก์ให้ไปล็อกอินก่อน #}
         <a class="px-4 py-2 rounded-xl ring-1 ring-gray-200 text-sm hover:bg-gray-50"
-           href="{% url 'login' %}">
+           href="{% url 'accounts:login' %}">
           ต้องการเพิ่มร้าน? เข้าสู่ระบบก่อน
         </a>
       {% endif %}

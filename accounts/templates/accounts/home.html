@@ -14,46 +14,74 @@
   </button>
 </div>
 
-<!-- ✅ Search Bar (ศูนย์กลาง) : ใต้ปุ่มวางแผน -->
+<!-- ✅ Search Bar (แยกเป็น 3 กล่อง สวยกว่า ไม่ติดเหลี่ยม) -->
 <div class="max-w-6xl mx-auto -mt-2 mb-6">
-  <form action="{% url 'searches:search' %}" method="get" class="max-w-3xl mx-auto">
-    <div class="bg-white rounded-2xl shadow-sm ring-1 ring-gray-200 p-3 flex flex-col md:flex-row gap-3">
-      <input
-        type="text"
-        name="q"
-        value="{{ request.GET.q|default:'' }}"
-        placeholder="ค้นหาเมนู / ร้าน / สูตรอาหาร / Community"
-        class="w-full md:flex-1 px-4 py-3 rounded-xl bg-gray-50 ring-1 ring-gray-200 focus:outline-none focus:ring-2 focus:ring-primary"
-      />
+  <form action="{% url 'searches:search' %}" method="get" class="max-w-4xl mx-auto">
+    <div class="flex flex-col md:flex-row gap-3">
 
-      <select
-        name="scope"
-        class="w-full md:w-48 px-4 py-3 rounded-xl bg-white ring-1 ring-gray-200 focus:outline-none focus:ring-2 focus:ring-primary"
-      >
-        <option value="all">ทั้งหมด</option>
-        <option value="menus">เมนูอาหาร</option>
-        <option value="restaurants">ร้านอาหาร</option>
-        <option value="recipes">สูตรอาหาร</option>
-        <option value="community">Community</option>
-      </select>
+      <!-- input -->
+      <div class="relative flex-1 bg-white rounded-2xl ring-1 ring-gray-200 shadow-sm">
+        <span class="absolute inset-y-0 left-4 flex items-center text-gray-400">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none">
+            <path d="M21 21l-4.3-4.3m1.3-5.2a7.5 7.5 0 11-15 0 7.5 7.5 0 0115 0z"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </span>
+        <input
+          type="text"
+          name="q"
+          value="{{ request.GET.q|default:'' }}"
+          placeholder="ค้นหาเมนู ร้านอาหาร สูตรอาหาร หรือโพสต์ใน Community"
+          class="w-full pl-12 pr-4 py-3.5 rounded-2xl bg-transparent
+                 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-white transition"
+          autocomplete="off"
+        />
+      </div>
 
+      <!-- select -->
+      <div class="bg-white rounded-2xl ring-1 ring-gray-200 shadow-sm md:w-56">
+        <select
+          name="scope"
+          class="w-full px-4 py-3.5 rounded-2xl bg-transparent
+                 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-white transition"
+        >
+          <option value="all" {% if request.GET.scope == "all" or not request.GET.scope %}selected{% endif %}>ทั้งหมด</option>
+          <option value="menus" {% if request.GET.scope == "menus" %}selected{% endif %}>เมนูอาหาร</option>
+          <option value="restaurants" {% if request.GET.scope == "restaurants" %}selected{% endif %}>ร้านอาหาร</option>
+          <option value="recipes" {% if request.GET.scope == "recipes" %}selected{% endif %}>สูตรอาหาร</option>
+          <option value="community" {% if request.GET.scope == "community" %}selected{% endif %}>Community</option>
+        </select>
+      </div>
+
+      <!-- button -->
       <button
         type="submit"
-        class="w-full md:w-28 px-4 py-3 rounded-xl bg-primary text-white font-semibold hover:bg-primary-dark"
+        class="bg-primary text-white font-semibold hover:bg-primary-dark active:scale-[0.99] transition
+               rounded-2xl shadow-sm px-6 py-3.5 md:w-40 inline-flex items-center justify-center gap-2"
       >
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M10 18a8 8 0 1 1 6.32-3.09l4.38 4.39-1.41 1.41-4.39-4.38A7.96 7.96 0 0 1 10 18z"/>
+        </svg>
         ค้นหา
       </button>
     </div>
 
-    {% if user.is_authenticated %}
-      <p class="text-xs text-gray-500 mt-2 text-center">
-        ระบบจะบันทึกประวัติการค้นหา (ดูได้ในเมนู “โปรไฟล์ → ประวัติการค้นหา”)
+    <!-- helper text -->
+    <div class="mt-2 flex flex-col md:flex-row md:items-center md:justify-between gap-1">
+      <p class="text-xs text-gray-500">
+        ตัวอย่าง: “กะเพรา”, “ร้านตามสั่ง”, “ไข่เจียว”
       </p>
-    {% else %}
-      <p class="text-xs text-gray-500 mt-2 text-center">
-        เข้าสู่ระบบเพื่อให้ระบบบันทึกประวัติการค้นหา
-      </p>
-    {% endif %}
+
+      {% if user.is_authenticated %}
+        <p class="text-xs text-gray-500">
+          ระบบบันทึกประวัติการค้นหาสำหรับสมาชิก
+        </p>
+      {% else %}
+        <p class="text-xs text-gray-500">
+          เข้าสู่ระบบเพื่อบันทึกประวัติการค้นหา
+        </p>
+      {% endif %}
+    </div>
   </form>
 </div>
 

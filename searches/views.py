@@ -8,7 +8,8 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.http import HttpResponseForbidden
 from django.utils import timezone
 
-from menus.models import Menu, Restaurant
+from menus.models import Menu
+from restaurants.models import Restaurant
 from recipes.models import Recipe
 from community.models import Topic
 from .models import SearchHistory
@@ -25,6 +26,43 @@ def _to_display_value(v) -> str:
     return str(v).strip()
 
 
+# ✅ เพิ่ม: ขยายคำค้นหาให้เป็นคำใกล้เคียง (ไทย)
+def expand_thai_keywords(q: str) -> list[str]:
+    q = (q or "").strip()
+    if not q:
+        return []
+
+    keywords = {q}
+
+    # กฎทั่วไป: ถ้ามี "กะ" ให้ลองเพิ่มแบบ "กระ"
+    if "กะ" in q:
+        keywords.add(q.replace("กะ", "กระ"))
+    if "กระ" in q:
+        keywords.add(q.replace("กระ", "กะ"))
+
+    # mapping แบบเจาะจง (เพิ่มได้เรื่อย ๆ)
+    pairs = {
+        "กะเพรา": ["กระเพรา", "ผัดกะเพรา", "ผัดกระเพรา"],
+        "กระเพรา": ["กะเพรา", "ผัดกะเพรา", "ผัดกระเพรา"],
+    }
+
+    for k, alts in pairs.items():
+        if k in q:
+            for a in alts:
+                keywords.add(a)
+
+    return list(keywords)
+
+
+def build_or_q(field: str, kws: list[str]) -> Q:
+    cond = Q()
+    for kw in kws:
+        kw = (kw or "").strip()
+        if kw:
+            cond |= Q(**{f"{field}__icontains": kw})
+    return cond
+
+
 @login_required
 def search(request):
     """
@@ -33,53 +71,56 @@ def search(request):
     q = (request.GET.get("q") or "").strip()
     scope = (request.GET.get("scope") or "all").strip()
 
-    # --- base result sets ---
     menus = Menu.objects.none()
     restaurants = Restaurant.objects.none()
     recipes = Recipe.objects.none()
     topics = Topic.objects.none()
 
+    keywords = expand_thai_keywords(q)
+
     if q:
         if scope in ("all", "menus"):
-            # ปรับ field ให้ตรงกับ Menu ของคุณ (เดิมคุณใช้ name/restaurant_name/price)
-            menus = Menu.objects.filter(
-                Q(name__icontains=q) |
-                Q(restaurant_name__icontains=q)
-            ).order_by("-id")[:40]
+            menus = (
+                Menu.objects.filter(
+                    build_or_q("name", keywords) |
+                    build_or_q("restaurant_name", keywords)
+                )
+                .order_by("-id")[:40]
+            )
 
         if scope in ("all", "restaurants"):
-            # ปรับ field ให้ตรงกับ Restaurant ของคุณ (สมมติ name)
-            restaurants = Restaurant.objects.filter(
-                Q(name__icontains=q)
-            ).order_by("-id")[:40]
+            restaurants = (
+                Restaurant.objects.filter(build_or_q("name", keywords))
+                .order_by("-id")[:40]
+            )
 
         if scope in ("all", "recipes"):
-            recipes = Recipe.objects.filter(
-                Q(title__icontains=q) |
-                Q(description__icontains=q) |
-                Q(ingredients__icontains=q) |
-                Q(steps__icontains=q)
-            ).order_by("-created_at")[:40]
+            recipes = (
+                Recipe.objects.filter(
+                    build_or_q("title", keywords) |
+                    build_or_q("description", keywords) |
+                    build_or_q("ingredients", keywords) |
+                    build_or_q("steps", keywords)
+                )
+                .order_by("-created_at")[:40]
+            )
 
         if scope in ("all", "community"):
-            # ✅ FIX HERE: Topic ไม่มี content -> ใช้ title/description แทน
-            # และคุมสิทธิ์: คนทั่วไปเห็นเฉพาะ approved (ถ้าโปรเจกต์ใช้ status แบบนี้)
             base_topics = Topic.objects.all()
             if not request.user.is_staff:
-                # ถ้าโปรเจกต์คุณใช้ชื่อสถานะอื่น ให้เปลี่ยน 'approved' ให้ตรง
                 base_topics = base_topics.filter(status="approved")
 
-            topics = base_topics.filter(
-                Q(title__icontains=q) |
-                Q(description__icontains=q)
-            ).order_by("-created_at")[:40]
+            topics = (
+                base_topics.filter(
+                    build_or_q("title", keywords) |
+                    build_or_q("description", keywords)
+                )
+                .order_by("-created_at")[:40]
+            )
 
-    # --- save history (กันพังด้วยการใช้ fields ที่ "มีจริง" ตามที่คุณใช้ก่อนหน้า) ---
-    # ถ้าโมเดลคุณใช้ keyword/filters_json/path/result_count ให้แก้ด้านล่างให้ตรง
     filters_json = {"scope": scope}
     result_count = int(menus.count() + restaurants.count() + recipes.count() + topics.count())
 
-    # รองรับได้ 2 แบบ: SearchHistory มี field query หรือ keyword
     create_kwargs = {
         "user": request.user,
         "path": request.path,
@@ -87,21 +128,17 @@ def search(request):
         "result_count": result_count,
     }
 
-    # ใส่คำค้นให้ถูก field
     if hasattr(SearchHistory, "query"):
         create_kwargs["query"] = q
     elif hasattr(SearchHistory, "keyword"):
         create_kwargs["keyword"] = q
 
-    # อัปเดตถ้ามี record เดิม “คำค้น+scope เดิม” เพื่อให้ updated_at ขยับ (UX ดี)
     try:
-        # พยายาม match ตาม field ที่มีจริง
-        lookup = {"user": request.user, "path": request.path}
+        lookup = {"user": request.user, "path": request.path, "filters_json": filters_json}
         if "query" in create_kwargs:
             lookup["query"] = q
         if "keyword" in create_kwargs:
             lookup["keyword"] = q
-        lookup["filters_json"] = filters_json
 
         obj = SearchHistory.objects.filter(**lookup).first()
         if obj:
@@ -113,7 +150,6 @@ def search(request):
         else:
             SearchHistory.objects.create(**create_kwargs)
     except Exception:
-        # history พังไม่ควรทำให้ search พัง
         pass
 
     return render(request, "searches/search_results.html", {
@@ -147,7 +183,6 @@ def history_list(request):
                 if val_str:
                     filters_pairs.append((k, val_str))
 
-        # รองรับ field query/keyword
         query_val = ""
         if hasattr(it, "query"):
             query_val = it.query or ""
@@ -191,7 +226,6 @@ def history_rerun(request, pk):
     item = get_object_or_404(SearchHistory, pk=pk, user=request.user)
 
     params = {}
-    # รองรับ query/keyword
     if hasattr(item, "query") and item.query:
         params["q"] = item.query
     elif hasattr(item, "keyword") and item.keyword:

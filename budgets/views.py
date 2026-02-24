@@ -7,6 +7,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Sum, Q, Count
 from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
@@ -14,6 +15,8 @@ from .forms import DailyBudgetForm
 from .models import DailyBudget, BudgetSpend, MealPlan
 from menus.models import Menu
 from recipes.models import Recipe
+
+import random
 
 
 # ------------------ คีย์เวิร์ด/ข้อจำกัด ------------------
@@ -658,6 +661,7 @@ def day_detail(request, date_str):
     the_date = _parse_date_or_today(date_str)
     active_plan = _get_active_plan(request)
 
+    # -------- budget --------
     budget_obj_qs = DailyBudget.objects.filter(user=request.user, date=the_date)
     if active_plan:
         budget_obj_qs = budget_obj_qs.filter(plan=active_plan)
@@ -674,7 +678,11 @@ def day_detail(request, date_str):
             budget_amount = 0.0
             current_plan = None
 
-    spends_qs = BudgetSpend.objects.filter(user=request.user, date=the_date).select_related("menu").order_by("created_at")
+    # -------- spends --------
+    spends_qs = BudgetSpend.objects.filter(
+        user=request.user, date=the_date
+    ).select_related("menu").order_by("created_at")
+
     if current_plan:
         spends_qs = spends_qs.filter(plan=current_plan)
 
@@ -682,6 +690,7 @@ def day_detail(request, date_str):
     spent_sum = float(spends_qs.aggregate(total=Sum("amount"))["total"] or 0)
     remain = budget_amount - spent_sum
 
+    # -------- group meals --------
     grouped = {label: [] for label in MEAL_LABELS}
     other_spends = []
     for s in plan_spends:
@@ -692,12 +701,201 @@ def day_detail(request, date_str):
 
     meal_groups = [{"label": label, "items": grouped[label]} for label in MEAL_LABELS]
 
-    recipe_matches = _build_recipe_matches(
-        plan_spends=plan_spends,
-        budget_amount=budget_amount,
-        remain=remain,
-        limit=8,
-    )
+    # =========================================================
+    # Recommend recipes: synonym clusters + scoring + random top pool
+    # =========================================================
+    CLUSTERS = {
+        "noodle": ["ก๋วยจั๊บ", "ก๋วยเตี๋ยว", "เส้น", "เส้นเล็ก", "เส้นใหญ่", "บะหมี่", "หมี่", "วุ้นเส้น", "มาม่า", "เกี๊ยว"],
+        "seafood": ["ทะเล", "กุ้ง", "ปลาหมึก", "ปลา", "หอย", "ปู", "กั้ง"],
+        "krapao": ["กะเพรา", "กระเพรา", "ผัดกะเพรา", "ผัดกระเพรา", "ใบกะเพรา"],
+        "curry": ["พะแนง", "เขียวหวาน", "ต้มยำ", "แกงส้ม", "แกงป่า", "มัสมั่น"],
+        "stirfry": ["ผัดไทย", "ผัดซีอิ๊ว", "ผัดขี้เมา", "คั่วกลิ้ง", "ผัดพริกแกง"],
+    }
+    PROTEIN = ["ไก่", "หมู", "เนื้อ", "ไข่", "กุ้ง", "ปลาหมึก", "ปลา", "หอย", "ปู", "กั้ง"]
+
+    STOP_WORDS = {
+        "ผัด", "ทอด", "ต้ม", "แกง", "ยำ", "น้ำ", "ใส่", "กับ", "ราด", "ข้าว",
+        "พิเศษ", "ธรรมดา", "เพิ่ม", "ไม่", "เผ็ด", "หวาน", "มัน", "น้อย", "มาก",
+    }
+
+    def _clean(text: str) -> str:
+        return (text or "").strip()
+
+    def _recipe_text(r: Recipe) -> str:
+        return " ".join([r.title or "", r.description or "", r.ingredients or "", r.steps or ""])
+
+    def _expand_by_clusters(text: str) -> list[str]:
+        t = _clean(text)
+        out = set()
+        for words in CLUSTERS.values():
+            if any(w in t for w in words):
+                out.update(words)
+        for p in PROTEIN:
+            if p in t:
+                out.add(p)
+        return list(out)
+
+    def _extract_keywords(menu_name: str) -> list[str]:
+        t = _clean(menu_name)
+        if not t:
+            return []
+
+        base = set()
+
+        # ถ้าเจอกลุ่ม -> เอาทั้งกลุ่ม
+        for words in CLUSTERS.values():
+            if any(w in t for w in words):
+                base.update(words)
+
+        # โปรตีน
+        for p in PROTEIN:
+            if p in t:
+                base.add(p)
+
+        # ลบคำทั่วไป แล้วเก็บเศษ
+        cleaned = t
+        for sw in STOP_WORDS:
+            cleaned = cleaned.replace(sw, "")
+        cleaned = cleaned.strip()
+        if len(cleaned) >= 2:
+            base.add(cleaned)
+
+        # กันคำสั้น/ซ้ำ
+        out = []
+        for k in base:
+            k = k.strip()
+            if len(k) >= 2:
+                out.append(k)
+        return list(dict.fromkeys(out))
+
+    def _score_recipe(recipe_text: str, kws: list[str], menu_text: str) -> int:
+        score = 0
+
+        # match keyword
+        for kw in kws:
+            if kw in recipe_text:
+                score += 1
+
+        # bonus: match cluster เดียวกันกับเมนูวันนี้
+        for words in CLUSTERS.values():
+            if any(w in menu_text for w in words) and any(w in recipe_text for w in words):
+                score += 3
+
+        return score
+
+    # -------- menu items today (only menu!=None) --------
+    menu_items = []
+    for s in plan_spends:
+        if getattr(s, "menu", None) and getattr(s.menu, "name", None):
+            menu_items.append({
+                "name": s.menu.name,
+                "price": float(getattr(s.menu, "price", 0) or 0),
+            })
+
+    # เมนูอ้างอิง (แพงสุด)
+    compare_menu_name = "-"
+    compare_menu_price = 0.0
+    if menu_items:
+        best = max(menu_items, key=lambda x: x["price"])
+        compare_menu_name = best["name"]
+        compare_menu_price = best["price"]
+
+    # -------- build keywords --------
+    keywords = []
+    for it in menu_items:
+        keywords.extend(_extract_keywords(it["name"]))
+        keywords.extend(_expand_by_clusters(it["name"]))
+    keywords = list(dict.fromkeys([k for k in keywords if k and len(k) >= 2]))
+
+    # -------- candidate recipes by OR query --------
+    candidates = []
+    if keywords:
+        q = Q()
+        for kw in keywords:
+            q |= (
+                Q(title__icontains=kw)
+                | Q(description__icontains=kw)
+                | Q(ingredients__icontains=kw)
+                | Q(steps__icontains=kw)
+            )
+        candidates = list(Recipe.objects.filter(q).distinct().order_by("-created_at")[:200])
+
+    menu_text = " ".join([it["name"] for it in menu_items])
+
+    scored = []
+    for r in candidates:
+        txt = _recipe_text(r)
+        s = _score_recipe(txt, keywords, menu_text)
+        if s > 0:
+            scored.append((s, r))
+
+    scored.sort(key=lambda x: (-x[0], -(x[1].created_at.timestamp() if x[1].created_at else 0)))
+
+    # -------- weighted random from top pool --------
+    TOP_POOL = 30
+    PICK_N = 6
+    MIN_SCORE = 2
+
+    pool = [(score, r) for score, r in scored if score >= MIN_SCORE][:TOP_POOL]
+
+    picked_recipes = []
+    if pool:
+        pool_copy = pool[:]
+        for _ in range(min(PICK_N, len(pool_copy))):
+            weights = [max(s, 1) for s, _r in pool_copy]
+            chosen_score, chosen_r = random.choices(pool_copy, weights=weights, k=1)[0]
+            picked_recipes.append(chosen_r)
+            pool_copy = [x for x in pool_copy if x[1].id != chosen_r.id]
+
+    # fallback ถ้าไม่เจอใกล้เคียงเลย -> เอาสูตรล่าสุด แต่จะติด badge "แนะนำ"
+    fallback_mode = False
+    if not picked_recipes:
+        fallback_mode = True
+        picked_recipes = list(Recipe.objects.all().order_by("-created_at")[:PICK_N])
+
+    # -------- build recipe_cards (filter out cps==0) --------
+    recipe_cards = []
+    for r in picked_recipes:
+        cps = _recipe_cost_per_serving(r)
+        try:
+            cps = float(cps or 0)
+        except Exception:
+            cps = 0.0
+
+        # ✅ ไม่แสดงสูตรที่ต้นทุนเป็น 0
+        if cps <= 0:
+            continue
+
+        diff = round(compare_menu_price - cps, 2)
+        if diff > 0:
+            diff_text = f"ประหยัด {diff} บาท/เสิร์ฟ"
+        elif diff < 0:
+            diff_text = f"แพงกว่า {abs(diff)} บาท/เสิร์ฟ"
+        else:
+            diff_text = "ราคาใกล้เคียง"
+
+        fit_remaining = (cps <= max(remain, 0))
+        fit_today_budget = (cps <= max(budget_amount, 0))
+
+        if fallback_mode:
+            badge = "แนะนำ"
+            badge_class = "bg-gray-50 text-gray-700 ring-gray-200"
+        else:
+            badge = "ประหยัดกว่า" if diff > 0 else "ใกล้เคียง"
+            badge_class = "bg-green-50 text-green-700 ring-green-200" if diff > 0 else "bg-gray-50 text-gray-700 ring-gray-200"
+
+        recipe_cards.append({
+            "recipe": r,
+            "badge": badge,
+            "badge_class": badge_class,
+            "compare_menu_name": compare_menu_name,
+            "compare_menu_price": round(compare_menu_price, 2),
+            "cost_per_serving": round(cps, 2),
+            "diff": diff,
+            "diff_text": diff_text,
+            "fit_remaining": fit_remaining,
+            "fit_today_budget": fit_today_budget,
+        })
 
     context = {
         "date": the_date,
@@ -706,13 +904,12 @@ def day_detail(request, date_str):
         "remain": round(remain, 2),
         "meal_groups": meal_groups,
         "other_spends": other_spends,
-        "recipe_matches": recipe_matches,
+        "recipe_cards": recipe_cards,
         "week_start": the_date - timedelta(days=the_date.weekday()),
         "plan_mode": bool(active_plan),
         "plan": active_plan,
     }
     return render(request, "budgets/day_detail.html", context)
-
 
 @login_required
 @require_POST
@@ -769,15 +966,24 @@ def save_menu_expense(request, menu_id: int):
 @login_required
 def dashboard(request):
     """
-    รองรับ 2 โหมด:
+    รองรับ 3 โหมด:
     1) มี ?plan_id=  -> Dashboard ของแผนนั้น (ตามช่วงแผน)
-    2) ไม่มี plan_id -> โหมดทั่วไป (แยกจาก plan: plan__isnull=True)
+    2) ไม่มี plan_id แต่มี session active_plan_id -> Dashboard ของแผนที่กำลังใช้งาน
+    3) ไม่มีทั้งคู่ -> โหมดทั่วไป (plan__isnull=True)
     """
-    plan_id = request.GET.get("plan_id")
+    # ✅ FIX: fallback ไป active_plan_id กันกรณีลิงก์ส่งมาแค่ ?from_plan=1
+    plan_id = request.GET.get("plan_id") or request.session.get("active_plan_id")
 
     # -------------------------------
     # โหมด Dashboard ของ "แผน"
     # -------------------------------
+    if plan_id:
+        # กัน plan_id ที่ไม่ใช่ตัวเลข
+        try:
+            plan_id = int(plan_id)
+        except Exception:
+            plan_id = None
+
     if plan_id:
         plan = get_object_or_404(MealPlan, id=plan_id, user=request.user)
 
@@ -849,7 +1055,7 @@ def dashboard(request):
         expensive_menus = [{"name": r["menu__name"], "total": float(r["total"] or 0)} for r in menu_totals.order_by("-total")[:3]]
         cheap_menus = [{"name": r["menu__name"], "total": float(r["total"] or 0)} for r in menu_totals.order_by("total")[:3]]
 
-        # แนะนำสูตรประหยัดกว่า (อิงรายการกินจริง + งบ/วัน + คงเหลือรวม)
+        # แนะนำสูตรประหยัดกว่า
         recipe_matches = _build_recipe_matches(
             plan_spends=list(plan_spends_qs),
             budget_amount=daily_amount,
@@ -860,7 +1066,6 @@ def dashboard(request):
         return render(request, "budgets/dashboard.html", {
             "plan_mode": True,
             "plan": plan,
-
             "start_date": start_date,
             "end_date": end_date,
 
@@ -947,36 +1152,32 @@ def dashboard(request):
 @login_required
 @require_POST
 def add_recipe_to_day(request, recipe_id: int):
-    """
-    เพิ่ม "สูตรอาหารแนะนำ" เข้าแผนของวันนั้นทันที
-    - บันทึกเป็น BudgetSpend (menu=None) เพื่อไม่ต้องแก้ Model
-    - amount = cost/serving (จาก recipe.total_cost / recipe.servings)
-    - note = มื้อที่เลือก + ชื่อสูตร
-    - รองรับ plan_id ผ่าน query หรือ active_plan ใน session
-    """
     recipe = get_object_or_404(Recipe, pk=recipe_id)
 
-    # date จากฟอร์ม (ส่งมาใน hidden input)
     use_date = _parse_date_or_today(request.POST.get("date"))
 
-    # เลือกมื้อ
     meal_label = (request.POST.get("meal_label") or "").strip()
     if meal_label not in MEAL_LABELS:
-        meal_label = ""  # ไม่บังคับให้เป็นมื้อ
+        meal_label = ""
 
-    # ใช้ plan ตามระบบคุณ (priority: plan_id ใน query > session active_plan_id)
     active_plan = _get_active_plan(request)
+    plan_id = active_plan.id if active_plan else None
 
-    # สร้างงบรายวันถ้ายังไม่มี
     _safe_get_or_create_daily(request, use_date, plan=active_plan)
 
-    # ราคาต่อเสิร์ฟ
     cps = _recipe_cost_per_serving(recipe)
+    try:
+        cps = float(cps or 0)
+    except Exception:
+        cps = 0.0
+
     if cps <= 0:
         messages.error(request, "สูตรนี้ยังไม่มีต้นทุน/จำนวนเสิร์ฟ จึงเพิ่มเป็นรายการใช้จ่ายไม่ได้")
-        return redirect(request.META.get("HTTP_REFERER") or "/budget/?from_plan=1")
+        fallback = reverse("budgets:day_detail", kwargs={"date_str": use_date.isoformat()})
+        if plan_id:
+            fallback = f"{fallback}?from_plan=1&plan_id={plan_id}"
+        return redirect(request.POST.get("next") or request.META.get("HTTP_REFERER") or fallback)
 
-    # note ให้เห็นชัดว่าเป็นสูตร
     if meal_label:
         note = f"{meal_label} (สูตร) {recipe.title}"
     else:
@@ -992,4 +1193,8 @@ def add_recipe_to_day(request, recipe_id: int):
     )
 
     messages.success(request, f"เพิ่มสูตร '{recipe.title}' เข้าวันที่ {use_date} แล้ว ({cps:.2f} บาท/เสิร์ฟ)")
-    return redirect(request.META.get("HTTP_REFERER") or f"/budget/budget/day/{use_date.isoformat()}/?from_plan=1")
+
+    fallback = reverse("budgets:day_detail", kwargs={"date_str": use_date.isoformat()})
+    if plan_id:
+        fallback = f"{fallback}?from_plan=1&plan_id={plan_id}"
+    return redirect(request.POST.get("next") or request.META.get("HTTP_REFERER") or fallback)

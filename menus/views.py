@@ -15,14 +15,37 @@ from restaurants.models import Restaurant
 # =========================
 
 def menu_list(request):
-    # ผู้ใช้ทั่วไปเห็นเฉพาะเมนูที่ APPROVED
-    qs = Menu.objects.filter(status=Menu.Status.APPROVED).order_by("-created_at")
-    return render(request, "menus/menu_list.html", {"menus": qs})
+    """หน้าเมนูรวม
+    - ทุกคนเห็น: เมนูที่อนุมัติแล้ว (APPROVED)
+    - ถ้าล็อกอิน: เห็น "เมนูของฉัน" เพิ่ม (ทุกสถานะ)
+    """
+    approved = Menu.objects.filter(status=Menu.Status.APPROVED).order_by("-created_at")
+
+    my_menus = Menu.objects.none()
+    if request.user.is_authenticated:
+        my_menus = Menu.objects.filter(created_by=request.user).order_by("-created_at")
+
+    return render(request, "menus/menu_list.html", {"menus": approved, "my_menus": my_menus})
 
 
 def menu_detail(request, pk):
-    # ผู้ใช้ทั่วไปดูได้เฉพาะ APPROVED
-    m = get_object_or_404(Menu, pk=pk, status=Menu.Status.APPROVED)
+    """หน้ารายละเอียดเมนู
+    - ไม่ล็อกอิน: ดูได้เฉพาะ APPROVED
+    - ล็อกอิน:
+        * staff/admin หรือเจ้าของเมนู -> ดูได้ทุกสถานะ
+        * user ทั่วไป -> ดูได้เฉพาะ APPROVED
+    """
+    m = get_object_or_404(Menu, pk=pk)
+
+    if not request.user.is_authenticated:
+        # ผู้ใช้ทั่วไป (ไม่ล็อกอิน)
+        if m.status != Menu.Status.APPROVED:
+            return redirect("menus:menu_list")
+    else:
+        if not (request.user.is_staff or request.user.is_superuser or m.created_by == request.user):
+            if m.status != Menu.Status.APPROVED:
+                return redirect("menus:menu_list")
+
     return render(request, "menus/menu_detail.html", {"menu": m})
 
 
@@ -301,10 +324,12 @@ def admin_ingredient_edit(request, pk):
 
 
 @staff_member_required
-@require_POST
 def admin_ingredient_delete(request, pk):
     ing = get_object_or_404(Ingredient, pk=pk)
-    name = ing.name
-    ing.delete()
-    messages.success(request, f"ลบวัตถุดิบ '{name}' แล้ว")
-    return redirect("menus:admin_ingredient_list")
+
+    if request.method == "POST":
+        ing.delete()
+        messages.success(request, "ลบวัตถุดิบเรียบร้อยแล้ว")
+        return redirect("menus:admin_ingredient_list")
+
+    return render(request, "menus/admin_ingredient_delete.html", {"ing": ing})

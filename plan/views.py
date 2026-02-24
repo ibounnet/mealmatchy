@@ -225,18 +225,78 @@ def plan_diet(request):
 
 @login_required
 def mealplan_summary(request):
-    plan = request.session.get("plan") or _ensure_session_plan(request)
+    """
+    Summary:
+    - ถ้ามี plan_id ใน query -> ใช้แผนจาก DB
+    - ถ้าไม่มี -> ใช้ active_plan_id ใน session
+    - ถ้าไม่มีอีก -> ใช้ session plan (กรณีสร้างแผนใหม่)
+    """
+    # 1) หา plan_id จาก URL หรือจาก active ใน session
+    plan_id = request.GET.get("plan_id") or request.session.get("active_plan_id")
 
-    days = _parse_int(plan.get("days", 7), 7)
-    if days not in (1, 7):
-        days = 7
+    plan_obj = None
+    if plan_id:
+        try:
+            plan_id_int = int(plan_id)
+            plan_obj = MealPlan.objects.filter(id=plan_id_int, user=request.user).first()
+        except Exception:
+            plan_obj = None
 
-    total_budget = _parse_float(plan.get("budget", 0), 0.0)
-    daily_budget = _daily_budget(total_budget, days)
+    # 2) สร้าง plan dict ที่ใช้กับ filter_by_plan ให้เป็น format เดิม
+    if plan_obj:
+        # ✅ ใช้แผนจริงในฐานข้อมูล
+        days = int(plan_obj.days or 1)
+        total_budget = float(plan_obj.budget_per_day or 0) * float(days)
+        daily_budget = float(plan_obj.budget_per_day or 0)
+        start_date = plan_obj.start_date
+        plan = {
+            "days": days,
+            "budget": total_budget,                     # งบรวมทั้งช่วง (เหมือน session)
+            "start_date": start_date.isoformat(),
+            "allergies": [],
+            "dislikes": [],
+            "religions": [],
+            "extra": {},
+            "title": plan_obj.title or "",
+        }
+        end_inclusive = _plan_end_date(start_date, days)
 
-    start_date = _parse_date(plan.get("start_date"))
-    end_inclusive = _plan_end_date(start_date, days)
+        # ใช้ยอดใช้จริงจาก BudgetSpend ของแผนนี้ (แม่นสุด)
+        used_amount = (
+            BudgetSpend.objects.filter(user=request.user, plan=plan_obj)
+            .aggregate(s=Sum("amount"))["s"] or 0
+        )
+        used_amount = float(used_amount)
+        remaining_budget = float(total_budget) - used_amount
 
+    else:
+        # ✅ fallback: กรณีสร้างแผนใหม่ ยังไม่ save (ใช้ session เหมือนเดิม)
+        plan = request.session.get("plan") or _ensure_session_plan(request)
+
+        days = _parse_int(plan.get("days", 7), 7)
+        if days not in (1, 7):
+            days = 7
+
+        total_budget = _parse_float(plan.get("budget", 0), 0.0)
+        daily_budget = _daily_budget(total_budget, days)
+
+        start_date = _parse_date(plan.get("start_date"))
+        end_inclusive = _plan_end_date(start_date, days)
+
+        selected_menus = request.session.get("selected_menus", [])
+        if not isinstance(selected_menus, list):
+            selected_menus = []
+
+        used_amount = 0.0
+        for m in selected_menus:
+            try:
+                used_amount += float(m.get("price", 0) or 0)
+            except Exception:
+                pass
+
+        remaining_budget = float(total_budget) - used_amount
+
+    # 3) แนะนำร้าน/เมนู (เหมือนเดิม)
     all_ids = list(Restaurant.objects.values_list("id", flat=True))
     picked_ids = random.sample(all_ids, min(3, len(all_ids))) if all_ids else []
     restaurants = Restaurant.objects.filter(id__in=picked_ids)
@@ -245,24 +305,17 @@ def mealplan_summary(request):
     price_limit = daily_budget if daily_budget > 0 else None
 
     for r in restaurants:
+        # NOTE: ของคุณใช้ FK restaurant ใน Menu อยู่แล้ว
         menus_qs = Menu.objects.filter(restaurant=r)
         menus_qs = filter_by_plan(menus_qs, plan)
         if price_limit:
             menus_qs = menus_qs.filter(price__lte=price_limit)
         data.append((r, list(menus_qs)))
 
+    # 4) selected_menus_json (ถ้าเป็นแผนจาก DB อาจไม่ต้องใช้ แต่ให้ไม่พัง)
     selected_menus = request.session.get("selected_menus", [])
     if not isinstance(selected_menus, list):
         selected_menus = []
-
-    used_amount = 0.0
-    for m in selected_menus:
-        try:
-            used_amount += float(m.get("price", 0) or 0)
-        except Exception:
-            pass
-
-    remaining_budget = float(total_budget) - used_amount
 
     return render(request, "plan/summary.html", {
         "plan": plan,
@@ -271,20 +324,26 @@ def mealplan_summary(request):
         "today": timezone.localdate(),
         "selected_menus_json": json.dumps(selected_menus, ensure_ascii=False),
 
-        "total_budget": round(total_budget, 2),
-        "daily_budget": round(daily_budget, 2),
-        "used_amount": round(used_amount, 2),
-        "remaining_budget": round(remaining_budget, 2),
+        "total_budget": round(float(total_budget), 2),
+        "daily_budget": round(float(daily_budget), 2),
+        "used_amount": round(float(used_amount), 2),
+        "remaining_budget": round(float(remaining_budget), 2),
 
         "plan_start_date": start_date.isoformat(),
-        "plan_days": days,
+        "plan_days": int(days),
         "plan_end_date": end_inclusive.isoformat(),
+
+        # ส่ง plan_id ให้ template ถ้าต้องใช้ลิงก์ต่อ
+        "active_plan_id": plan_obj.id if plan_obj else None,
     })
 
 
 @login_required
 @require_POST
 def save_plan(request):
+    # ✅ โหมดคุมเข้ม: True = เกินงบ/วัน ห้ามบันทึก, False = เตือนแต่ยังบันทึก
+    STRICT_PER_DAY = False
+
     try:
         raw = json.loads(request.POST.get("menus", "[]"))
     except Exception:
@@ -305,31 +364,74 @@ def save_plan(request):
     daily_budget = _daily_budget(total_budget, days)
     end_date_inclusive = _plan_end_date(start_date, days)
 
-    # validate per-day (ห้ามเกินงบ/วัน)
+    # -------------------------------
+    # helper: หา date ให้เมนูแบบปลอดภัย
+    # ถ้ามี date/day_offset ใช้ตามนั้น
+    # ถ้าไม่มี -> กระจายตาม index ไปแต่ละวัน (กันกองวันเดียว)
+    # -------------------------------
+    def _safe_plan_date(start_date: date, payload: dict, idx: int) -> date:
+        d = payload.get("date")
+        if d:
+            try:
+                return date.fromisoformat(str(d))
+            except Exception:
+                pass
+
+        if payload.get("day_offset") is not None:
+            try:
+                off = int(payload["day_offset"])
+                if off < 0:
+                    off = 0
+                return start_date + timedelta(days=off)
+            except Exception:
+                pass
+
+        # ✅ fallback สำคัญ: กระจายวันตามลำดับเมนู
+        off = idx % max(int(days), 1)
+        return start_date + timedelta(days=off)
+
+    # -------------------------------
+    # validate per-day
+    # -------------------------------
     if daily_budget > 0:
         sums: Dict[str, float] = {}
-        for m in menus:
+        for idx, m in enumerate(menus):
             menu = Menu.objects.filter(pk=m["id"]).only("id", "price").first()
             if not menu:
                 continue
-            spend_date = _menu_date_from_payload(start_date, m)
+
+            spend_date = _safe_plan_date(start_date, m, idx)
             spend_date = max(start_date, min(end_date_inclusive, spend_date))
             k = spend_date.isoformat()
             sums[k] = sums.get(k, 0.0) + float(menu.price or 0)
 
+        overs = []
         for d_iso, total in sums.items():
             if total > daily_budget:
                 over = round(total - daily_budget, 2)
+                overs.append((d_iso, over))
+
+        if overs:
+            if STRICT_PER_DAY:
+                d_iso, over = overs[0]
                 messages.error(request, f"บันทึกแผนไม่ได้: วันที่ {d_iso} เกินงบเฉลี่ยต่อวัน {over} บาท")
                 return redirect("plan:summary")
+            else:
+                msg = ", ".join([f"{d} เกิน {o} บาท" for d, o in overs])
+                messages.warning(request, f"แจ้งเตือน: บางวันเกินงบเฉลี่ยต่อวัน ({msg}) แต่ระบบยังบันทึกแผนให้")
 
+    # -------------------------------
     # กันซ้ำ: ลบแผนเดิมช่วงเดียวกัน
+    # -------------------------------
     old_plans = MealPlan.objects.filter(user=request.user, start_date=start_date, days=days)
     if old_plans.exists():
         BudgetSpend.objects.filter(user=request.user, plan__in=old_plans).delete()
         DailyBudget.objects.filter(user=request.user, plan__in=old_plans).delete()
         old_plans.delete()
 
+    # -------------------------------
+    # create plan
+    # -------------------------------
     plan_obj = MealPlan.objects.create(
         user=request.user,
         start_date=start_date,
@@ -349,12 +451,12 @@ def save_plan(request):
         )
 
     # BudgetSpend
-    for m in menus:
+    for idx, m in enumerate(menus):
         menu = Menu.objects.filter(pk=m["id"]).only("id", "price").first()
         if not menu:
             continue
 
-        spend_date = _menu_date_from_payload(start_date, m)
+        spend_date = _safe_plan_date(start_date, m, idx)
         spend_date = max(start_date, min(end_date_inclusive, spend_date))
 
         BudgetSpend.objects.create(
@@ -372,8 +474,10 @@ def save_plan(request):
     request.session.modified = True
 
     messages.success(request, "บันทึกแผนเรียบร้อยแล้ว")
+
+    # ✅ เด้งไปหน้าตารางจากแผนตามรูป
     url = reverse("budgets:home")
-    return redirect(f"{url}?plan_id={plan_obj.id}")
+    return redirect(f"{url}?from_plan=1&plan_id={plan_obj.id}")
 
 
 @login_required
@@ -448,16 +552,35 @@ def my_plans(request):
     return render(request, "plan/my_plans.html", {"items": items})
 
 
-
 @login_required
 def use_plan(request, plan_id: int):
     """
-    ใช้แผนนี้ = แค่ตั้งให้เป็น active (เปลี่ยนสถานะ)
-    แล้วกลับมาหน้า my-plans (ไม่เด้งไป Summary)
+    ใช้แผนนี้ = ตั้ง active และ sync session["plan"] ให้ตรงกับแผนใน DB
+    เพื่อให้หน้า Summary/ตารางงบ ใช้ค่า budget/day ถูกต้อง
     """
     plan = get_object_or_404(MealPlan, id=plan_id, user=request.user)
 
+    # ✅ ตั้ง active
     request.session["active_plan_id"] = plan.id
+
+    # ✅ sync session plan ให้ตรงกับแผนที่เลือกจริง
+    days = int(plan.days or 1)
+    daily = float(plan.budget_per_day or 0)
+    total_budget = daily * days
+
+    request.session["plan"] = {
+        "days": days,
+        "budget": float(total_budget),               # งบรวมทั้งช่วง
+        "start_date": plan.start_date.isoformat(),
+        "allergies": [],
+        "dislikes": [],
+        "religions": [],
+        "extra": {},
+        "title": plan.title or "",
+    }
+
+    # ✅ เคลียร์ selected_menus ของแผนกำลังสร้าง (กันเอาของเก่ามาปน)
+    request.session.pop("selected_menus", None)
     request.session.modified = True
 
     messages.success(request, "ตั้งค่าแผนที่กำลังใช้งานเรียบร้อยแล้ว")

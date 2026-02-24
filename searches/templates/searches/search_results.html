@@ -38,7 +38,6 @@
 
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {% for m in menus %}
-            <!-- ✅ ไม่มีลิงก์ไป detail แล้ว เพื่อกัน NoReverseMatch -->
             <div class="block rounded-2xl ring-1 ring-gray-100 overflow-hidden bg-white hover:shadow-sm transition">
               {% if m.image %}
                 <img src="{{ m.image.url }}" alt="{{ m.name }}" class="w-full h-36 object-cover">
@@ -69,29 +68,76 @@
     <!-- RESTAURANTS -->
     {% if restaurants %}
       <section class="bg-white rounded-2xl shadow-sm ring-1 ring-gray-200 p-5 mb-6">
-        <h2 class="text-lg font-bold text-gray-900 mb-3">ร้านอาหาร</h2>
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div class="flex items-center justify-between gap-3 mb-3">
+          <h2 class="text-lg font-bold text-gray-900">ร้านอาหาร</h2>
+          <a href="{% url 'restaurants:restaurant_list' %}?q={{ q|urlencode }}"
+             class="text-sm font-semibold text-primary hover:underline">
+            ดูทั้งหมดในหน้าร้านอาหาร →
+          </a>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {% for r in restaurants %}
-            <div class="rounded-2xl ring-1 ring-gray-100 p-4 bg-white">
-              <div class="font-semibold text-gray-900">{{ r.name }}</div>
-            </div>
+            <a href="{% url 'restaurants:restaurant_detail' r.pk %}"
+               class="block rounded-2xl ring-1 ring-gray-100 overflow-hidden bg-white hover:shadow-sm transition">
+
+              {% if r.image %}
+                <img src="{{ r.image.url }}" alt="{{ r.name }}" class="w-full h-36 object-cover">
+              {% elif r.photo %}
+                <img src="{{ r.photo.url }}" alt="{{ r.name }}" class="w-full h-36 object-cover">
+              {% elif r.cover_image %}
+                <img src="{{ r.cover_image.url }}" alt="{{ r.name }}" class="w-full h-36 object-cover">
+              {% else %}
+                <div class="w-full h-36 bg-gray-50 flex items-center justify-center text-gray-400 text-sm">ไม่มีรูป</div>
+              {% endif %}
+
+              <div class="p-4">
+                <div class="font-semibold text-gray-900 line-clamp-1">{{ r.name }}</div>
+                <div class="pt-2">
+                  <span class="inline-flex items-center justify-center w-full px-3 py-2 rounded-xl bg-primary text-white text-sm font-semibold">
+                    ดูรายละเอียดร้าน
+                  </span>
+                </div>
+              </div>
+            </a>
           {% endfor %}
         </div>
       </section>
     {% endif %}
 
-    <!-- RECIPES -->
+    <!-- RECIPES (✅ FIX URL: recipes:list) -->
     {% if recipes %}
       <section class="bg-white rounded-2xl shadow-sm ring-1 ring-gray-200 p-5 mb-6">
-        <h2 class="text-lg font-bold text-gray-900 mb-3">สูตรอาหาร</h2>
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div class="flex items-center justify-between gap-3 mb-3">
+          <h2 class="text-lg font-bold text-gray-900">สูตรอาหาร</h2>
+          <a href="{% url 'recipes:list' %}?q={{ q|urlencode }}"
+             class="text-sm font-semibold text-primary hover:underline">
+            ดูทั้งหมดในหน้าสูตรอาหาร →
+          </a>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {% for r in recipes %}
             <a href="{% url 'recipes:detail' r.id %}"
-               class="rounded-2xl ring-1 ring-gray-100 p-4 bg-white hover:shadow-sm transition">
-              <div class="font-semibold text-gray-900">{{ r.title }}</div>
-              {% if r.description %}
-                <div class="text-sm text-gray-500 mt-1 line-clamp-2">{{ r.description }}</div>
+               class="block rounded-2xl ring-1 ring-gray-100 overflow-hidden bg-white hover:shadow-sm transition">
+
+              {% if r.image %}
+                <img src="{{ r.image.url }}" alt="{{ r.title }}" class="w-full h-36 object-cover">
+              {% else %}
+                <div class="w-full h-36 bg-gray-50 flex items-center justify-center text-gray-400 text-sm">ไม่มีรูป</div>
               {% endif %}
+
+              <div class="p-4">
+                <div class="font-semibold text-gray-900 line-clamp-1">{{ r.title }}</div>
+                {% if r.description %}
+                  <div class="text-xs text-gray-500 mt-1 line-clamp-2">{{ r.description }}</div>
+                {% endif %}
+                <div class="pt-2">
+                  <span class="inline-flex items-center justify-center w-full px-3 py-2 rounded-xl bg-primary text-white text-sm font-semibold">
+                    ดูสูตรอาหาร
+                  </span>
+                </div>
+              </div>
             </a>
           {% endfor %}
         </div>
@@ -102,14 +148,33 @@
     {% if topics %}
       <section class="bg-white rounded-2xl shadow-sm ring-1 ring-gray-200 p-5 mb-6">
         <h2 class="text-lg font-bold text-gray-900 mb-3">Community</h2>
-        <div class="space-y-3">
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {% for t in topics %}
             <a href="{% url 'community:topic_detail' t.id %}"
-               class="block rounded-2xl ring-1 ring-gray-100 p-4 bg-white hover:shadow-sm transition">
-              <div class="font-semibold text-gray-900">{{ t.title }}</div>
-              {% if t.description %}
-                <div class="text-sm text-gray-500 mt-1 line-clamp-2">{{ t.description }}</div>
+               class="block rounded-2xl ring-1 ring-gray-100 overflow-hidden bg-white hover:shadow-sm transition">
+
+              {% if t.image %}
+                <img src="{{ t.image.url }}" alt="{{ t.title }}" class="w-full h-36 object-cover">
+              {% elif t.photo %}
+                <img src="{{ t.photo.url }}" alt="{{ t.title }}" class="w-full h-36 object-cover">
+              {% elif t.cover_image %}
+                <img src="{{ t.cover_image.url }}" alt="{{ t.title }}" class="w-full h-36 object-cover">
+              {% else %}
+                <div class="w-full h-36 bg-gray-50 flex items-center justify-center text-gray-400 text-sm">ไม่มีรูป</div>
               {% endif %}
+
+              <div class="p-4">
+                <div class="font-semibold text-gray-900 line-clamp-1">{{ t.title }}</div>
+                {% if t.description %}
+                  <div class="text-xs text-gray-500 mt-1 line-clamp-2">{{ t.description }}</div>
+                {% endif %}
+                <div class="pt-2">
+                  <span class="inline-flex items-center justify-center w-full px-3 py-2 rounded-xl bg-white ring-1 ring-gray-200 text-gray-700 text-sm font-semibold hover:bg-gray-50">
+                    อ่านโพสต์
+                  </span>
+                </div>
+              </div>
             </a>
           {% endfor %}
         </div>

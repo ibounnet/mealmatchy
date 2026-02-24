@@ -6,6 +6,7 @@ from django.core.paginator import Paginator
 from django.db.models import Q
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.urls import reverse
 from django.shortcuts import render, redirect, get_object_or_404
 
 from menus.models import Ingredient
@@ -196,14 +197,22 @@ def _compute_hidden_preview(servings, cook_minutes, stove_type, setting):
 @login_required
 def cost_settings(request):
     setting = _get_or_create_user_setting(request.user)
-    next_url = request.GET.get("next") or request.POST.get("next") or ""
+
+    # รับ next จาก GET/POST
+    next_url = (request.POST.get("next") or request.GET.get("next") or "").strip()
 
     if request.method == "POST":
         form = UserCookingCostSettingForm(request.POST, instance=setting)
         if form.is_valid():
             form.save()
             messages.success(request, "บันทึกการตั้งค่าเรียบร้อยแล้ว")
-            return redirect(next_url or "recipes:cost_settings")
+
+            # ✅ อยู่หน้าเดิมหลังบันทึก (แต่พก next ไปด้วย)
+            if next_url:
+                return redirect(f"{reverse('recipes:cost_settings')}?next={next_url}")
+            return redirect("recipes:cost_settings")
+        else:
+            messages.error(request, "กรุณาตรวจสอบข้อมูลที่กรอก")
     else:
         form = UserCookingCostSettingForm(instance=setting)
 
@@ -219,9 +228,13 @@ def _cost_per_serving_decimal(recipe: Recipe) -> Decimal:
     return (total / Decimal(servings)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
-@login_required
+
 def recipe_list(request, mine_only=False):
     mine_only = bool(mine_only)
+
+    # ถ้าเข้าหน้า 'สูตรของฉัน' แต่ยังไม่ล็อกอิน ให้ไปหน้าเข้าสู่ระบบ
+    if mine_only and not request.user.is_authenticated:
+        return redirect('accounts:login')
 
     q = (request.GET.get("q") or "").strip()
     sort = (request.GET.get("sort") or "new").strip()
@@ -293,17 +306,30 @@ def recipe_list(request, mine_only=False):
 
 
 
-@login_required
+
 def recipe_detail(request, pk):
     recipe = get_object_or_404(
         Recipe.objects.prefetch_related("recipe_ingredients__ingredient"), pk=pk
     )
 
+    # ✅ ผู้ใช้ทั่วไป (ยังไม่ล็อกอิน) ให้ดูได้แบบ view-only
+    #    - ไม่สร้าง setting
+    #    - ไม่คำนวณต้นทุนแฝง (แสดงเฉพาะต้นทุนวัตถุดิบที่ snapshot ไว้)
+    if not request.user.is_authenticated:
+        ingredient_cost = (recipe.total_cost or Decimal("0")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        return render(request, "recipes/recipe_detail.html", {
+            "recipe": recipe,
+            "rows": recipe.recipe_ingredients.all(),
+            "total_cost": ingredient_cost,
+            "cost_breakdown": None,
+        })
+
+    # ✅ ผู้ใช้ที่ล็อกอิน: คำนวณต้นทุนแบบ Hybrid (วัตถุดิบ + ต้นทุนแฝง)
     setting = _get_or_create_user_setting(request.user)
     hidden = _compute_hidden_cost(recipe, setting)
 
-    ingredient_cost = recipe.total_cost
-    total_cost = (ingredient_cost + hidden["hidden_cost"]).quantize(Decimal("0.01"))
+    ingredient_cost = recipe.total_cost or Decimal("0")
+    total_cost = (ingredient_cost + hidden["hidden_cost"]).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
     return render(request, "recipes/recipe_detail.html", {
         "recipe": recipe,
@@ -324,27 +350,48 @@ def add_recipe(request):
 
     if request.method == "POST":
         form = RecipeForm(request.POST, request.FILES)
+
+        # rows_json มาจาก hidden input ชื่อ rows_json
         rows = _parse_rows_json(request.POST.get("rows_json"))
 
-        if form.is_valid() and rows:
+        if form.is_valid():
             recipe = form.save(commit=False)
             recipe.created_by = request.user
+
+            # ถ้าไม่เลือกเตา ให้เป็น None
             recipe.stove_type = recipe.stove_type or None
+
             recipe.save()
-            _save_recipe_ingredients(recipe, rows)
+
+            # ✅ บันทึกวัตถุดิบแบบตาราง (มีหรือไม่มีได้)
+            if rows:
+                _save_recipe_ingredients(recipe, rows)
+
+            # ❗ถ้าหนูต้อง "บังคับ" ให้มีวัตถุดิบอย่างน้อย 1 รายการจริง ๆ
+            # ให้ย้าย recipe.save() ลงมาหลังเช็ค rows และทำ messages.error แล้ว return render แทน
+            # แต่ตอนนี้พี่ทำแบบ "เซฟสูตรได้" เพื่อกันข้อมูล steps/ingredients หายตอนสอบ
+
             messages.success(request, "เพิ่มสูตรอาหารเรียบร้อยแล้ว")
             return redirect("recipes:detail", recipe.id)
 
-        messages.error(request, "กรุณากรอกข้อมูลให้ครบ")
+        messages.error(request, "กรุณาตรวจสอบข้อมูลที่กรอกให้ครบถ้วน")
+
+        # ✅ preview ตอน POST ไม่ผ่าน (ดึงค่าจากฟอร์มที่ผู้ใช้กรอก)
+        servings = int(request.POST.get("servings") or 1)
+        cook_min = int(request.POST.get("cook_minutes") or 0)
+        stove = (request.POST.get("stove_type") or "").strip()
+
+        hidden_preview = _compute_hidden_preview(servings, cook_min, stove, setting)
 
     else:
         form = RecipeForm()
+        hidden_preview = _compute_hidden_preview(1, 0, "", setting)
 
     return render(request, "recipes/add_recipe.html", {
         "form": form,
         "ingredients": Ingredient.objects.order_by("name"),
         "setting": setting,
-        "hidden_preview": _compute_hidden_preview(1, 0, "", setting),
+        "hidden_preview": hidden_preview,
     })
 
 

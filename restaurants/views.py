@@ -1,6 +1,7 @@
 # restaurants/views.py
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
+from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
@@ -17,8 +18,30 @@ def restaurant_list(request):
 
 def restaurant_detail(request, pk):
     r = get_object_or_404(Restaurant, pk=pk, is_active=True)
-    return render(request, "restaurants/restaurant_detail.html", {"restaurant": r})
 
+    # ✅ เมนูของร้าน: รองรับทั้ง
+    # 1) เมนูที่ผูก FK restaurant
+    # 2) เมนูเก่าที่ restaurant เป็น NULL แต่มี restaurant_name เก็บชื่อร้านไว้
+    from menus.models import Menu  # import ในฟังก์ชันเพื่อลด circular import
+
+    menus_qs = (
+        Menu.objects.filter(
+            Q(restaurant=r) |
+            (Q(restaurant__isnull=True) & Q(restaurant_name__icontains=r.name))
+        )
+        .select_related("restaurant", "created_by")
+        .order_by("-created_at")
+        .distinct()
+    )
+
+    # ✅ คุมสิทธิ์การมองเห็น
+    if not request.user.is_authenticated:
+        menus_qs = menus_qs.filter(status=Menu.Status.APPROVED)
+    else:
+        if not (request.user.is_staff or request.user.is_superuser):
+            menus_qs = menus_qs.filter(Q(status=Menu.Status.APPROVED) | Q(created_by=request.user))
+
+    return render(request, "restaurants/restaurant_detail.html", {"restaurant": r, "menus": menus_qs})
 
 def request_new_restaurant(request):
     """
