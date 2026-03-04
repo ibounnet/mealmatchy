@@ -5,6 +5,8 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
+from restaurants.forms import RestaurantForm
+
 from .models import Restaurant
 
 
@@ -123,67 +125,60 @@ def admin_reject_restaurant(request, pk):
     messages.success(request, f"ปฏิเสธและลบคำขอร้าน '{name}' เรียบร้อยแล้ว")
     return redirect("restaurants:admin_restaurant_list")
 
-
 @staff_member_required
 def admin_add_restaurant(request):
     """
-    เพิ่มร้านโดยแอดมิน: บันทึกเป็น is_active=True
-    ใช้ template: restaurants/admin_add_restaurant.html (มีอยู่แล้วตามภาพ)
+    เพิ่มร้านโดยแอดมิน: ตั้ง is_active=True
+    template: restaurants/admin_add_restaurant.html
     """
     if request.method == "POST":
-        name = (request.POST.get("name") or "").strip()
-        description = (request.POST.get("description") or "").strip()
-        location = (request.POST.get("location") or "").strip()
-        image = request.FILES.get("image")
+        form = RestaurantForm(request.POST, request.FILES)
 
-        if not name:
-            messages.error(request, "กรุณากรอกชื่อร้าน")
-            return render(request, "restaurants/admin_add_restaurant.html")
+        if form.is_valid():
+            name = (form.cleaned_data.get("name") or "").strip()
 
-        if Restaurant.objects.filter(name=name).exists():
-            messages.error(request, "ชื่อร้านนี้มีอยู่แล้ว")
-            return render(request, "restaurants/admin_add_restaurant.html")
+            # กันชื่อซ้ำ (optional แต่ดีมาก)
+            if Restaurant.objects.filter(name__iexact=name).exists():
+                messages.error(request, "ชื่อร้านนี้มีอยู่แล้ว")
+                return render(request, "restaurants/admin_add_restaurant.html", {"form": form})
 
-        Restaurant.objects.create(
-            name=name,
-            description=description,
-            location=location,
-            image=image,
-            is_active=True,
-            created_by=request.user,
-        )
-        messages.success(request, "เพิ่มร้านอาหารเรียบร้อยแล้ว")
-        return redirect("restaurants:admin_restaurant_list")
+            obj = form.save(commit=False)
 
-    return render(request, "restaurants/admin_add_restaurant.html")
+            # ถ้า model มี field เหล่านี้จริงค่อยเก็บ (กันพังด้วย hasattr)
+            if hasattr(obj, "is_active"):
+                obj.is_active = True
+            if hasattr(obj, "created_by"):
+                obj.created_by = request.user
 
+            obj.save()
+
+            messages.success(request, "เพิ่มร้านอาหารเรียบร้อยแล้ว")
+            return redirect("restaurants:admin_restaurant_list")
+
+        messages.error(request, "กรุณาตรวจสอบข้อมูลอีกครั้ง")
+    else:
+        form = RestaurantForm()
+
+    return render(request, "restaurants/admin_add_restaurant.html", {"form": form})
 
 @staff_member_required
 def admin_edit_restaurant(request, pk):
-    r = get_object_or_404(Restaurant, pk=pk)
+    restaurant = get_object_or_404(Restaurant, pk=pk)
 
     if request.method == "POST":
-        r.name = (request.POST.get("name") or "").strip()
-        r.description = (request.POST.get("description") or "").strip()
-        r.location = (request.POST.get("location") or "").strip()
+        form = RestaurantForm(request.POST, request.FILES, instance=restaurant)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "แก้ไขร้านอาหารเรียบร้อยแล้ว")
+            return redirect("restaurants:admin_restaurant_list")  # ถ้าชื่อ url ไม่ตรง ให้แก้ตาม urls.py
+        messages.error(request, "กรุณาตรวจสอบข้อมูลอีกครั้ง")
+    else:
+        form = RestaurantForm(instance=restaurant)
 
-        if "image" in request.FILES:
-            r.image = request.FILES["image"]
-
-        # toggle active ได้จากฟอร์มถ้ามี checkbox
-        is_active = request.POST.get("is_active")
-        if is_active is not None:
-            r.is_active = (is_active == "on")
-
-        if not r.name:
-            messages.error(request, "กรุณากรอกชื่อร้าน")
-            return render(request, "restaurants/admin_edit_restaurant.html", {"restaurant": r})
-
-        r.save()
-        messages.success(request, "แก้ไขร้านอาหารเรียบร้อยแล้ว")
-        return redirect("restaurants:admin_restaurant_list")
-
-    return render(request, "restaurants/admin_edit_restaurant.html", {"restaurant": r})
+    return render(request, "restaurants/admin_edit_restaurant.html", {
+        "restaurant": restaurant,
+        "form": form,
+    })
 
 
 @staff_member_required

@@ -1,18 +1,88 @@
 {% extends 'base.html' %}
 {% block title %}แก้ไขเมนู (แอดมิน){% endblock %}
+
 {% block content %}
 <div class="max-w-2xl mx-auto">
   <h1 class="text-2xl font-bold text-gray-800 mb-6">แก้ไขเมนู (แอดมิน)</h1>
-  <form method="POST" enctype="multipart/form-data" class="bg-white p-6 rounded-2xl ring-1 ring-gray-100 space-y-5">
+
+  <form method="POST" enctype="multipart/form-data"
+        class="bg-white p-6 rounded-2xl ring-1 ring-gray-100 space-y-5">
     {% csrf_token %}
-    <div><label class="block text-sm mb-1">ชื่อร้าน (พิมพ์ได้เอง)</label>{{ form.restaurant_name }}</div>
-    <div><label class="block text-sm mb-1">ชื่อเมนู</label>{{ form.name }}</div>
-    <div><label class="block text-sm mb-1">รายละเอียด</label>{{ form.description }}</div>
-    <div><label class="block text-sm mb-1">ราคา (บาท)</label>{{ form.price }}</div>
-    <div><label class="block text-sm mb-1">รูปภาพ</label>{{ form.image }}</div>
+
+    {% if form.non_field_errors %}
+      <div class="rounded-xl bg-red-50 ring-1 ring-red-200 p-3 text-sm text-red-700">
+        {{ form.non_field_errors }}
+      </div>
+    {% endif %}
+
+    <!-- ✅ ร้าน: เลือกจาก list (ถ้ามี) -->
+    <div>
+      <label class="block text-sm mb-1 font-medium text-gray-700">เลือกร้าน (ถ้ามี)</label>
+      <select name="restaurant"
+              class="w-full px-3 py-2 rounded-xl ring-1 ring-gray-200 bg-white">
+        <option value="">ไม่เลือก (พิมพ์ชื่อร้านเอง)</option>
+        {% for r in restaurants %}
+          <option value="{{ r.id }}" {% if menu.restaurant and menu.restaurant.id == r.id %}selected{% endif %}>
+            {{ r.name }}
+          </option>
+        {% endfor %}
+      </select>
+      <p class="text-xs text-gray-500 mt-1">ถ้าเลือก ร้าน ระบบจะเติมชื่อร้านอัตโนมัติ (ถ้าไม่พิมพ์เอง)</p>
+    </div>
+
+    <!-- ✅ ร้าน: พิมพ์ชื่อเอง -->
+    <div>
+      <label class="block text-sm mb-1 font-medium text-gray-700">ชื่อร้าน (พิมพ์ได้เอง)</label>
+      <input type="text" name="restaurant_name"
+             value="{{ request.POST.restaurant_name|default:menu.restaurant_name|default:'' }}"
+             class="w-full px-3 py-2 rounded-xl ring-1 ring-gray-200 bg-white"
+             placeholder="เช่น ร้านก๋วยจั๊บ, ร้านตามสั่ง...">
+    </div>
+
+    <!-- ✅ ฟิลด์จาก MenuForm (เติมค่าเดิมให้เองเพราะ instance=m) -->
+    <div>
+      <label class="block text-sm mb-1 font-medium text-gray-700">ชื่อเมนู</label>
+      {{ form.name }}
+      {% if form.name.errors %}<p class="text-xs text-red-600 mt-1">{{ form.name.errors|striptags }}</p>{% endif %}
+    </div>
+
+    <div>
+      <label class="block text-sm mb-1 font-medium text-gray-700">รายละเอียด</label>
+      {{ form.description }}
+      {% if form.description.errors %}<p class="text-xs text-red-600 mt-1">{{ form.description.errors|striptags }}</p>{% endif %}
+    </div>
+
+    <div>
+      <label class="block text-sm mb-1 font-medium text-gray-700">ราคา (บาท)</label>
+      {{ form.price }}
+      {% if form.price.errors %}<p class="text-xs text-red-600 mt-1">{{ form.price.errors|striptags }}</p>{% endif %}
+    </div>
+
+    <div>
+      <label class="block text-sm mb-1 font-medium text-gray-700">รูปภาพ</label>
+
+      {% if menu.image %}
+        <div class="mb-2">
+          <img src="{{ menu.image.url }}" alt="menu image"
+               class="h-24 w-24 object-cover rounded-xl ring-1 ring-gray-200">
+          <div class="text-xs text-gray-500 mt-1">รูปปัจจุบัน</div>
+        </div>
+      {% endif %}
+
+      {{ form.image }}
+      {% if form.image.errors %}<p class="text-xs text-red-600 mt-1">{{ form.image.errors|striptags }}</p>{% endif %}
+    </div>
+
     <div class="flex items-center gap-3 pt-2">
-      <button class="px-4 py-2 rounded-xl bg-primary text-white hover:bg-primary-dark">บันทึก</button>
-      <a href="{% url 'admin_menu_list' %}" class="px-4 py-2 rounded-xl ring-1 ring-gray-200 text-gray-700 hover:bg-gray-50">ยกเลิก</a>
+      <button type="submit"
+              class="px-4 py-2 rounded-xl bg-primary text-white hover:bg-primary-dark">
+        บันทึก
+      </button>
+
+      <a href="{% url 'menus:admin_menu_list' %}"
+         class="px-4 py-2 rounded-xl ring-1 ring-gray-200 text-gray-700 hover:bg-gray-50">
+        ยกเลิก
+      </a>
     </div>
   </form>
 </div>

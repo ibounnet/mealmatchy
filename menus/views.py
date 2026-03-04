@@ -6,6 +6,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
+from menus.forms import MenuForm
+
 from .models import Menu, Ingredient
 from restaurants.models import Restaurant
 
@@ -211,46 +213,45 @@ def admin_menu_list(request):
 
     return render(request, "menus/admin_menu_list.html", {"menus": qs, "active_tab": status})
 
-
 @staff_member_required
 def admin_edit_menu(request, pk):
     m = get_object_or_404(Menu, pk=pk)
 
     if request.method == "POST":
-        m.name = (request.POST.get("name") or "").strip()
-        m.description = (request.POST.get("description") or "").strip()
-        m.price = request.POST.get("price") or "0"
+        # ✅ ฟอร์มใช้แก้ name/description/price/image
+        form = MenuForm(request.POST, request.FILES, instance=m)
 
-        restaurant_id = request.POST.get("restaurant")
+        # ✅ ค่าที่อยู่นอกฟอร์ม: ร้าน (เลือก/พิมพ์เอง)
+        restaurant_id = (request.POST.get("restaurant") or "").strip()
         restaurant_name = (request.POST.get("restaurant_name") or "").strip()
 
-        if restaurant_id:
-            m.restaurant = Restaurant.objects.filter(pk=restaurant_id, is_active=True).first()
-            if m.restaurant and not restaurant_name:
-                restaurant_name = m.restaurant.name
-        m.restaurant_name = restaurant_name
+        if form.is_valid():
+            obj = form.save(commit=False)
 
-        if "image" in request.FILES:
-            m.image = request.FILES["image"]
+            # ถ้าเลือก restaurant (FK) มาก่อน
+            if restaurant_id:
+                obj.restaurant = Restaurant.objects.filter(pk=restaurant_id, is_active=True).first()
+                if obj.restaurant and not restaurant_name:
+                    restaurant_name = obj.restaurant.name
 
-        if not m.name:
-            messages.error(request, "กรุณากรอกชื่อเมนู")
-            return render(
-                request,
-                "menus/admin_edit_menu.html",
-                {"menu": m, "restaurants": Restaurant.objects.filter(is_active=True), "ingredients": Ingredient.objects.all()},
-            )
+            # ถ้าพิมพ์ชื่อร้านเอง -> เก็บใน restaurant_name
+            obj.restaurant_name = restaurant_name
 
-        m.save()
-        messages.success(request, "แก้ไขเมนู (Admin) เรียบร้อยแล้ว")
-        return redirect("menus:admin_menu_list")
+            obj.save()
+            messages.success(request, "แก้ไขเมนู (Admin) เรียบร้อยแล้ว")
+            return redirect("menus:admin_menu_list")
 
-    return render(
-        request,
-        "menus/admin_edit_menu.html",
-        {"menu": m, "restaurants": Restaurant.objects.filter(is_active=True), "ingredients": Ingredient.objects.all()},
-    )
+        messages.error(request, "กรุณาตรวจสอบข้อมูลอีกครั้ง")
 
+    else:
+        form = MenuForm(instance=m)
+
+    return render(request, "menus/admin_edit_menu.html", {
+        "menu": m,
+        "form": form,  # ✅ สำคัญ: ให้ template ใช้
+        "restaurants": Restaurant.objects.filter(is_active=True),
+        "ingredients": Ingredient.objects.all(),
+    })
 
 @staff_member_required
 @require_POST

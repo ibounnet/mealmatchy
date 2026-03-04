@@ -1,14 +1,66 @@
 {% extends 'base.html' %}
 {% block title %}เพิ่มร้านอาหาร (แอดมิน){% endblock %}
+
 {% block content %}
 <div class="max-w-2xl mx-auto">
-  <h1 class="text-2xl font-bold mb-6">เพิ่มร้านอาหาร (แอดมิน)</h1>
-  <form method="post" enctype="multipart/form-data" class="bg-white p-6 rounded-2xl ring-1 ring-gray-100 space-y-4">
+  <h1 class="text-2xl font-bold text-gray-800 mb-6">เพิ่มร้านอาหาร (แอดมิน)</h1>
+
+  {% if messages %}
+    <div class="space-y-2 mb-4">
+      {% for message in messages %}
+        <div class="px-4 py-2 rounded-xl text-sm
+          {% if message.tags == 'success' %}bg-green-50 text-green-700
+          {% elif message.tags == 'error' %}bg-red-50 text-red-700
+          {% else %}bg-gray-50 text-gray-700{% endif %}">
+          {{ message }}
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <form method="post" enctype="multipart/form-data"
+        class="bg-white p-6 rounded-2xl ring-1 ring-gray-100 space-y-5">
     {% csrf_token %}
-    {{ form.as_p }}
-    <div class="flex gap-2">
-      <button class="px-4 py-2 rounded-xl bg-primary text-white">บันทึก</button>
-      <a href="{% url 'restaurants:admin_restaurant_list' %}" class="px-4 py-2 rounded-xl ring-1 ring-gray-200">ยกเลิก</a>
+
+    {% if form.non_field_errors %}
+      <div class="rounded-xl bg-red-50 ring-1 ring-red-200 p-3 text-sm text-red-700">
+        {{ form.non_field_errors }}
+      </div>
+    {% endif %}
+
+    <div>
+      <label class="block text-sm mb-1 font-medium text-gray-700">ชื่อร้านอาหาร</label>
+      {{ form.name }}
+      {% if form.name.errors %}<p class="text-xs text-red-600 mt-1">{{ form.name.errors|striptags }}</p>{% endif %}
+    </div>
+
+    <div>
+      <label class="block text-sm mb-1 font-medium text-gray-700">ที่ตั้ง/สถานที่</label>
+      {{ form.location }}
+      {% if form.location.errors %}<p class="text-xs text-red-600 mt-1">{{ form.location.errors|striptags }}</p>{% endif %}
+    </div>
+
+    <div>
+      <label class="block text-sm mb-1 font-medium text-gray-700">รายละเอียดร้าน</label>
+      {{ form.description }}
+      {% if form.description.errors %}<p class="text-xs text-red-600 mt-1">{{ form.description.errors|striptags }}</p>{% endif %}
+    </div>
+
+    <div>
+      <label class="block text-sm mb-1 font-medium text-gray-700">รูปภาพ</label>
+      {{ form.image }}
+      {% if form.image.errors %}<p class="text-xs text-red-600 mt-1">{{ form.image.errors|striptags }}</p>{% endif %}
+    </div>
+
+    <div class="flex gap-2 pt-2">
+      <button type="submit"
+              class="px-4 py-2 rounded-xl bg-primary text-white hover:bg-primary-dark">
+        บันทึก
+      </button>
+      <a href="{% url 'restaurants:admin_restaurant_list' %}"
+         class="px-4 py-2 rounded-xl ring-1 ring-gray-200 text-gray-700 hover:bg-gray-50">
+        ยกเลิก
+      </a>
     </div>
   </form>
 </div>

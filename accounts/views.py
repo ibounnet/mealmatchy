@@ -27,16 +27,17 @@ def _meal_status_for_date(user, the_date, plan=None):
     if plan:
         qs = qs.filter(plan=plan)
 
-    done_set = set(qs.values_list("note", flat=True))
-    done_labels = [x for x in MEAL_LABELS if x in done_set]
-    missing_labels = [x for x in MEAL_LABELS if x not in done_set]
+    done_set = set(qs.values_list("note", flat=True)) 
+    done_set = set(qs.values_list("note", flat=True)) 
+    done_labels = [x for x in MEAL_LABELS if x in done_set] #มื้อที่มีอยู่แล้ว
+    missing_labels = [x for x in MEAL_LABELS if x not in done_set] #มื้ิอที่ยังไม่มี
 
     return {
-        "done_labels": done_labels,
+        "done_labels": done_labels, 
         "missing_labels": missing_labels,
         "done_count": len(done_labels),
         "total": len(MEAL_LABELS),
-        "is_complete": (len(done_labels) == len(MEAL_LABELS)),
+        "is_complete": (len(done_labels) == len(MEAL_LABELS)), #ทำครบ3มื้อมมั้ย
     }
 
 
@@ -61,11 +62,11 @@ def _find_model_by_names(model_names):
 
 def home_view(request):
     try:
-        budget = int(request.GET.get("budget", 50))
+        budget = int(request.GET.get("budget", 50)) #อ่านงบ
     except (TypeError, ValueError):
         budget = 50
 
-    menus = Menu.objects.filter(price__lte=budget, status=Menu.Status.APPROVED).order_by("-created_at")[:12]
+    menus = Menu.objects.filter(price__lte=budget, status=Menu.Status.APPROVED).order_by("-created_at")[:12] #ดึงเมนูราคาไม่เกินงบและต้องอนุมัติแล้ว
 
     ctx = {"budget": budget, "menus": menus, "today_meal_status": None, "today_date": None}
 

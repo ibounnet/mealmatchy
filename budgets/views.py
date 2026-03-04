@@ -19,32 +19,6 @@ from recipes.models import Recipe
 import random
 
 
-# ------------------ คีย์เวิร์ด/ข้อจำกัด ------------------
-KW = {
-    "หมู": ["หมู", "หมูกรอบ", "หมูสับ", "สามชั้น", "pork", "เบคอน", "bacon"],
-    "ไก่": ["ไก่", "chicken"],
-    "เนื้อวัว": ["เนื้อวัว", "เนื้อ", "วัว", "beef"],
-    "กุ้ง": ["กุ้ง", "shrimp", "prawn"],
-    "ทะเล": ["ทะเล", "ซีฟู้ด", "seafood", "หมึก", "ปลาหมึก", "squid", "หอย", "ปู", "crab", "clam", "oyster", "กุ้ง"],
-    "เห็ด": ["เห็ด", "mushroom"],
-    "หัวหอม": ["หัวหอม", "หอมใหญ่", "หอมแดง", "onion"],
-    "เครื่องใน": ["เครื่องใน", "ตับ", "ไส้", "กึ๋น", "offal", "liver"],
-    "ผักชี": ["ผักชี", "coriander", "cilantro"],
-    "กระเทียม": ["กระเทียม", "garlic"],
-    "นม": ["นม", "ชีส", "เนย", "milk", "cheese", "butter", "cream", "โยเกิร์ต", "yogurt"],
-    "ไข่": ["ไข่", "egg"],
-    "แป้งสาลี": ["แป้งสาลี", "แป้ง", "wheat", "กลูเตน", "gluten", "บะหมี่", "ขนมปัง", "แป้งทอด"],
-    "ถั่ว": ["ถั่ว", "peanut", "อัลมอนด์", "almond", "nut"],
-}
-
-RELIGION_BLOCK = {
-    "ฮาลาล": ["หมู", "pork", "เบคอน", "alcohol", "ไวน์", "เบียร์"],
-    "อาหารเจ": ["หมู", "ไก่", "เนื้อวัว", "กุ้ง", "ทะเล", "ไข่", "นม", "meat", "egg", "milk", "butter"],
-    "มังสวิรัติ": ["หมู", "ไก่", "เนื้อวัว", "กุ้ง", "ทะเล", "meat", "pork", "beef", "chicken", "seafood"],
-    "หลีกเลี่ยงแอลกอฮอล์": ["alcohol", "ไวน์", "เบียร์", "rum", "whisky", "sake"],
-}
-
-
 def filter_by_plan(qs, plan: dict | None):
     """
     กรองเมนูตามแผน:
@@ -273,7 +247,7 @@ def _build_recipe_matches(
     """
     แนะนำสูตรอาหารจากเมนูที่กินในวันนั้น แล้วเทียบต้นทุนต่อเสิร์ฟ
 
-    เงื่อนไขสำคัญตามอาจารย์:
+    เงื่อนไขสำคัญ
     - ไม่แสดงสูตรที่ต้นทุน/เสิร์ฟ <= 0 (เพราะเทียบไม่ได้และทำให้เข้าใจผิด)
     """
     menu_spends: List[Tuple[str, float]] = []
@@ -656,12 +630,13 @@ def consume_outside(request):
     return redirect(request.GET.get("next") or "/budget/?from_plan=1")
 
 
-@login_required
+@login_required 
 def day_detail(request, date_str):
     the_date = _parse_date_or_today(date_str)
     active_plan = _get_active_plan(request)
 
     # -------- budget --------
+    #งบของวันนั้น
     budget_obj_qs = DailyBudget.objects.filter(user=request.user, date=the_date)
     if active_plan:
         budget_obj_qs = budget_obj_qs.filter(plan=active_plan)
@@ -679,6 +654,7 @@ def day_detail(request, date_str):
             current_plan = None
 
     # -------- spends --------
+    #ดึง “รายการใช้จ่าย” ของวันนั้น + คำนวณใช้ไปเท่าไร เหลือเท่าไร
     spends_qs = BudgetSpend.objects.filter(
         user=request.user, date=the_date
     ).select_related("menu").order_by("created_at")
@@ -687,10 +663,11 @@ def day_detail(request, date_str):
         spends_qs = spends_qs.filter(plan=current_plan)
 
     plan_spends = list(spends_qs)
-    spent_sum = float(spends_qs.aggregate(total=Sum("amount"))["total"] or 0)
-    remain = budget_amount - spent_sum
+    spent_sum = float(spends_qs.aggregate(total=Sum("amount"))["total"] or 0) #รวมยอดค่าใช้จ่ายวันนั้น
+    remain = budget_amount - spent_sum #เงินที่เหลือในวันนั้น
 
     # -------- group meals --------
+    #จัดกลุ่มรายจ่ายเป็น “มื้อเช้า/เที่ยง/เย็น” และ “อื่น ๆ”
     grouped = {label: [] for label in MEAL_LABELS}
     other_spends = []
     for s in plan_spends:
@@ -718,7 +695,7 @@ def day_detail(request, date_str):
         "พิเศษ", "ธรรมดา", "เพิ่ม", "ไม่", "เผ็ด", "หวาน", "มัน", "น้อย", "มาก",
     }
 
-    def _clean(text: str) -> str:
+    def _clean(text: str) -> str: #สหรับสร้างคีย์วอร์ด
         return (text or "").strip()
 
     def _recipe_text(r: Recipe) -> str:
@@ -728,7 +705,7 @@ def day_detail(request, date_str):
         t = _clean(text)
         out = set()
         for words in CLUSTERS.values():
-            if any(w in t for w in words):
+            if any(w in t for w in words): #เจอคำในคลัสเตอร์อาจจะนำมาขยายเป็นคำว่าอื่น
                 out.update(words)
         for p in PROTEIN:
             if p in t:
@@ -796,7 +773,7 @@ def day_detail(request, date_str):
     compare_menu_name = "-"
     compare_menu_price = 0.0
     if menu_items:
-        best = max(menu_items, key=lambda x: x["price"])
+        best = max(menu_items, key=lambda x: x["price"]) #เลือก “เมนูอ้างอิง” เป็นเมนูที่แพงสุด
         compare_menu_name = best["name"]
         compare_menu_price = best["price"]
 
@@ -825,7 +802,7 @@ def day_detail(request, date_str):
     scored = []
     for r in candidates:
         txt = _recipe_text(r)
-        s = _score_recipe(txt, keywords, menu_text)
+        s = _score_recipe(txt, keywords, menu_text) #คำนวณคะแนนและจัดอันดับ
         if s > 0:
             scored.append((s, r))
 
@@ -842,6 +819,7 @@ def day_detail(request, date_str):
     if pool:
         pool_copy = pool[:]
         for _ in range(min(PICK_N, len(pool_copy))):
+             #random เพื่อเลือกสูตร (ไม่ซ้ำ แต่ยังเอียงไปทางคะแนนสูง
             weights = [max(s, 1) for s, _r in pool_copy]
             chosen_score, chosen_r = random.choices(pool_copy, weights=weights, k=1)[0]
             picked_recipes.append(chosen_r)
@@ -854,7 +832,7 @@ def day_detail(request, date_str):
         picked_recipes = list(Recipe.objects.all().order_by("-created_at")[:PICK_N])
 
     # -------- build recipe_cards (filter out cps==0) --------
-    recipe_cards = []
+    recipe_cards = [] #recipe_cards พร้อมเทียบ “ประหยัด/แพงกว่า”
     for r in picked_recipes:
         cps = _recipe_cost_per_serving(r)
         try:
@@ -894,7 +872,7 @@ def day_detail(request, date_str):
             "diff": diff,
             "diff_text": diff_text,
             "fit_remaining": fit_remaining,
-            "fit_today_budget": fit_today_budget,
+            "fit_today_budget": fit_today_budget, #“ต้นทุนสูตรนี้ <= งบทั้งวัน” ไหม
         })
 
     context = {
@@ -966,33 +944,38 @@ def save_menu_expense(request, menu_id: int):
 @login_required
 def dashboard(request):
     """
-    รองรับ 3 โหมด:
-    1) มี ?plan_id=  -> Dashboard ของแผนนั้น (ตามช่วงแผน)
+    3 โหมด:
+    1) มี ?plan_id=  -> Dashboard ของแผนนั้น
     2) ไม่มี plan_id แต่มี session active_plan_id -> Dashboard ของแผนที่กำลังใช้งาน
     3) ไม่มีทั้งคู่ -> โหมดทั่วไป (plan__isnull=True)
     """
-    # ✅ FIX: fallback ไป active_plan_id กันกรณีลิงก์ส่งมาแค่ ?from_plan=1
+
+    # 1) หา plan_id จาก query ก่อน ถ้าไม่มีก็ fallback จาก session (active_plan_id)
     plan_id = request.GET.get("plan_id") or request.session.get("active_plan_id")
 
     # -------------------------------
     # โหมด Dashboard ของ "แผน"
     # -------------------------------
     if plan_id:
-        # กัน plan_id ที่ไม่ใช่ตัวเลข
+        # 2) กันค่าที่ไม่ใช่ตัวเลข
         try:
             plan_id = int(plan_id)
         except Exception:
             plan_id = None
 
     if plan_id:
+        # 3) ดึงแผนของ user เท่านั้น (กันคนอื่นเดา plan_id)
         plan = get_object_or_404(MealPlan, id=plan_id, user=request.user)
 
+        # 4) กำหนดช่วงวันของแผน
         start_date = plan.start_date
         end_date = _plan_end_date(plan.start_date, int(plan.days or 1))
 
+        # 5) คำนวณงบรวมของแผน (งบ/วัน * จำนวนวัน)
         daily_amount = float(plan.budget_per_day or 0)
         total_budget = daily_amount * int(plan.days or 1)
 
+        # 6) ดึงค่าใช้จ่ายในช่วงแผน (เลือก menu มาด้วยเพื่อแสดงผล)
         plan_spends_qs = BudgetSpend.objects.filter(
             user=request.user,
             plan=plan,
@@ -1000,22 +983,26 @@ def dashboard(request):
             date__lte=end_date,
         ).select_related("menu").order_by("date", "id")
 
+        # 7) รวมยอดใช้จ่าย และคำนวณเงินคงเหลือ/ใช้เกิน
         total_spent = float(plan_spends_qs.aggregate(s=Sum("amount"))["s"] or 0)
         remaining = total_budget - total_spent
         daily_average = daily_amount
         over_amount = max(0.0, total_spent - total_budget)
 
-        # rows รายวัน
+        # 8) สร้างตารางรายวัน (rows) เพื่อแสดง Budget/Spent/Remain และสถานะมื้อ
         rows = []
         cur = start_date
         while cur <= end_date:
+            # ใช้ DailyBudget ถ้ามี; ถ้าไม่มีให้ใช้ budget_per_day ของแผน
             db = DailyBudget.objects.filter(user=request.user, plan=plan, date=cur).first()
             budget_amount = float(db.amount) if db else daily_amount
 
+            # รายจ่ายของวันนั้น
             spends = list(plan_spends_qs.filter(date=cur))
             spent_amount = sum(float(s.amount or 0) for s in spends)
             remain_amount = budget_amount - spent_amount
 
+            # สถานะมื้อ (ยังไม่เริ่ม/ค้าง/ครบ)
             ms = _meal_status_from_spends(spends)
 
             rows.append({
@@ -1031,7 +1018,7 @@ def dashboard(request):
             })
             cur += timedelta(days=1)
 
-        # match score
+        # 9) match_score วัดความใกล้เคียงระหว่างงบรวมกับใช้จริง แล้วแปลงเป็น label สี
         match_score = _calc_match_score(total_budget, total_spent)
         if match_score >= 80:
             match_label, match_class = "ดีมาก", "bg-green-50 text-green-700 ring-green-200"
@@ -1040,22 +1027,28 @@ def dashboard(request):
         else:
             match_label, match_class = "ควรปรับ", "bg-red-50 text-red-700 ring-red-200"
 
-        # สรุปมื้อ
+        # 10) สรุปจำนวนมื้อ (แยกตาม note: มื้อเช้า/เที่ยง/เย็น)
         meal_spends_qs = plan_spends_qs.filter(note__in=MEAL_LABELS)
         total_meals = meal_spends_qs.count()
         meal_counts = meal_spends_qs.values("note").annotate(total=Count("id")).order_by("-total")
         meals_by_type = [{"label": r["note"], "total": r["total"]} for r in meal_counts]
 
-        # เมนูแพง/ถูก
+        # 11) สรุปเมนูแพง/ถูก (Top 3) จากยอดใช้จ่ายรวมต่อเมนู
         menu_totals = (
             plan_spends_qs.filter(menu__isnull=False)
             .values("menu__name")
             .annotate(total=Sum("amount"))
         )
-        expensive_menus = [{"name": r["menu__name"], "total": float(r["total"] or 0)} for r in menu_totals.order_by("-total")[:3]]
-        cheap_menus = [{"name": r["menu__name"], "total": float(r["total"] or 0)} for r in menu_totals.order_by("total")[:3]]
+        expensive_menus = [
+            {"name": r["menu__name"], "total": float(r["total"] or 0)}
+            for r in menu_totals.order_by("-total")[:3]
+        ]
+        cheap_menus = [
+            {"name": r["menu__name"], "total": float(r["total"] or 0)}
+            for r in menu_totals.order_by("total")[:3]
+        ]
 
-        # แนะนำสูตรประหยัดกว่า
+        # 12) แนะนำสูตรอาหารที่มีแนวโน้มประหยัดกว่า จากรายการที่กินจริงในแผน
         recipe_matches = _build_recipe_matches(
             plan_spends=list(plan_spends_qs),
             budget_amount=daily_amount,
@@ -1063,6 +1056,7 @@ def dashboard(request):
             limit=8,
         )
 
+        # 13) ส่งข้อมูลทั้งหมดไป template (โหมดแผน)
         return render(request, "budgets/dashboard.html", {
             "plan_mode": True,
             "plan": plan,
@@ -1091,6 +1085,7 @@ def dashboard(request):
     # -----------------------------------------
     # โหมดทั่วไป (ไม่มี plan_id): plan__isnull=True
     # -----------------------------------------
+    # 14) ถ้าไม่มีแผน: ใช้ช่วง 7 วันนับจากวันนี้ และดูเฉพาะรายการที่ไม่ผูก plan
     start_date = timezone.localdate()
     end_date = start_date + timedelta(days=6)
 
@@ -1121,6 +1116,7 @@ def dashboard(request):
         })
         cur += timedelta(days=1)
 
+    # 15) สรุปรวมแบบโหมดทั่วไป (ไม่มี match_score/recipe_matches)
     total_budget = sum(r["budget_amount"] for r in rows)
     total_spent = sum(r["spent_amount"] for r in rows)
     remaining = total_budget - total_spent
